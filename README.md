@@ -2,19 +2,15 @@
 
 This repo contains BA/architecture instruction prompts and a small automation that can:
 
-1) Receive a Jira webhook when an issue changes.
-2) Trigger a GitHub Actions workflow.
-3) Fetch the triggering Jira ticket details.
-4) Call the GitHub Models API to run the BA assistant prompt (see `instructions/platform/ba-role.md`).
-5) Produce a strict JSON plan as an artifact (`ba-output.json`).
+1. Receive a Jira webhook when an issue changes.
+2. Trigger a GitHub Actions workflow.
+3. Fetch the triggering Jira ticket details.
+4. Call the GitHub Models API to run the BA assistant prompt (see `instructions/platform/ba-role.md`).
+5. Produce a strict JSON plan as an artifact (`ba-output.json`).
 
 ## Automation Overview
 
-There are two components:
-	- Fetches the Jira issue JSON via Jira REST API
-	- Builds a prompt from ticket content
-	- Calls GitHub Models chat completions endpoint
-	- Writes `ba-output.json`
+There are two components: - Fetches the Jira issue JSON via Jira REST API - Builds a prompt from ticket content - Calls GitHub Models chat completions endpoint - Writes `ba-output.json`
 
 ## GitHub Actions Setup
 

@@ -48,9 +48,11 @@ public final class HttpJson {
     }
 
     private static String truncate(String body) {
-        if (body == null) return "";
+        if (body == null)
+            return "";
         int max = 1500;
-        if (body.length() <= max) return body;
+        if (body.length() <= max)
+            return body;
         return body.substring(0, max) + "…";
     }
 }

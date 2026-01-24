@@ -40,7 +40,8 @@ public final class JiraClient {
     }
 
     private static String stripTrailingSlash(String value) {
-        if (value == null) return null;
+        if (value == null)
+            return null;
         while (value.endsWith("/")) {
             value = value.substring(0, value.length() - 1);
         }

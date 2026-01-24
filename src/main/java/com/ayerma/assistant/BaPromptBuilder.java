@@ -3,7 +3,23 @@ package com.ayerma.assistant;
 import com.fasterxml.jackson.databind.JsonNode;
 
 public final class BaPromptBuilder {
-    private BaPromptBuilder() {}
+    private BaPromptBuilder() {
+    }
+
+    public static String buildUserPrompt(String issueKey, String summary, String description) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Jira issue key: ").append(issueKey != null ? issueKey : "(unknown)").append("\n");
+        sb.append("Title: ").append(summary != null && !summary.isBlank() ? summary : "(unknown)").append("\n\n");
+
+        if (description != null && !description.isBlank()) {
+            sb.append("Description:\n").append(description).append("\n\n");
+        }
+
+        sb.append("Task: Convert this Jira ticket into an implementation plan following the BA role instructions. ")
+                .append("Return ONLY the STRICT JSON as specified (no markdown).\n");
+
+        return sb.toString();
+    }
 
     public static String buildUserPromptFromJiraIssue(JsonNode issue) {
         String key = textAt(issue, "/key");
@@ -19,7 +35,7 @@ public final class BaPromptBuilder {
         }
 
         sb.append("Task: Convert this Jira ticket into an implementation plan following the BA role instructions. ")
-          .append("Return ONLY the STRICT JSON as specified (no markdown).\n");
+                .append("Return ONLY the STRICT JSON as specified (no markdown).\n");
 
         return sb.toString();
     }
@@ -28,7 +44,8 @@ public final class BaPromptBuilder {
         if (descriptionNode == null || descriptionNode.isMissingNode() || descriptionNode.isNull()) {
             return null;
         }
-        // Jira Cloud description is often Atlassian Document Format (ADF). We try to extract plain text best-effort.
+        // Jira Cloud description is often Atlassian Document Format (ADF). We try to
+        // extract plain text best-effort.
         StringBuilder sb = new StringBuilder();
         flattenAdfText(descriptionNode, sb);
         String text = sb.toString().replaceAll("[\\u0000-\\u001F]+", " ").trim();
@@ -36,7 +53,8 @@ public final class BaPromptBuilder {
     }
 
     private static void flattenAdfText(JsonNode node, StringBuilder out) {
-        if (node == null || node.isNull() || node.isMissingNode()) return;
+        if (node == null || node.isNull() || node.isMissingNode())
+            return;
 
         if (node.isObject()) {
             JsonNode type = node.get("type");
@@ -69,7 +87,8 @@ public final class BaPromptBuilder {
 
     private static String textAt(JsonNode node, String pointer) {
         JsonNode value = node.at(pointer);
-        if (value.isMissingNode() || value.isNull()) return null;
+        if (value.isMissingNode() || value.isNull())
+            return null;
         return value.asText(null);
     }
 

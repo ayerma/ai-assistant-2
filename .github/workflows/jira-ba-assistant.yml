@@ -48,7 +48,8 @@ jobs:
           MODELS_ENDPOINT: ${{ vars.MODELS_ENDPOINT }}
           MODELS_MODEL: ${{ vars.MODELS_MODEL }}
 
-          BA_INSTRUCTIONS_PATH: instructions/platform/ba-role.md
+          BA_INSTRUCTIONS_PATH: instructions/platform/roles/ba-role.md
+          TECHNICAL_REQUIREMENTS_PATH: instructions/platform/technical/technical-requirements.md
           BA_OUTPUT_PATH: ba-output.json
 
           JIRA_ISSUE_KEY: ${{ inputs.ticket_id }}
