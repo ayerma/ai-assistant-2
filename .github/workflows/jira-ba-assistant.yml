@@ -1,0 +1,64 @@
+name: Jira -> BA Assistant
+
+on:
+  workflow_dispatch:
+    inputs:
+      ticket_id:
+        description: "Jira issue key (e.g., PROJ-123)"
+        required: true
+        type: string
+      ticket_summary:
+        description: "Jira issue summary (optional, will fetch if not provided)"
+        required: false
+        type: string
+      ticket_description:
+        description: "Jira issue description (optional, will fetch if not provided)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  run-ba-assistant:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Build
+        run: mvn -q -DskipTests package
+
+      - name: Run BA assistant
+        env:
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+
+          # GitHub Models
+          MODELS_TOKEN: ${{ secrets.MODELS_TOKEN }}
+          MODELS_ENDPOINT: ${{ vars.MODELS_ENDPOINT }}
+          MODELS_MODEL: ${{ vars.MODELS_MODEL }}
+
+          BA_INSTRUCTIONS_PATH: instructions/platform/ba-role.md
+          BA_OUTPUT_PATH: ba-output.json
+
+          JIRA_ISSUE_KEY: ${{ inputs.ticket_id }}
+          JIRA_ISSUE_SUMMARY: ${{ inputs.ticket_summary }}
+          JIRA_ISSUE_DESCRIPTION: ${{ inputs.ticket_description }}
+        run: |
+          java -jar target/ai-assistant-2-automation-0.1.0-all.jar
+
+      - name: Upload result
+        uses: actions/upload-artifact@v4
+        with:
+          name: ba-output
+          path: ba-output.json
