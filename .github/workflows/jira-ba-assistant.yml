@@ -63,6 +63,13 @@ jobs:
           echo "=== Testing copilot command ==="
           $NPM_BIN/copilot --version || echo "copilot command not available"
 
+      - name: Authenticate Copilot CLI
+        if: ${{ vars.USE_MODELS_API != 'true' && vars.USE_MODELS_API != '' }}
+        run: |
+          echo "=== Authenticating GitHub Copilot CLI ==="
+          echo "${{ secrets.COPILOT_PAT }}" | gh auth login --with-token
+          gh auth status
+
       - name: Run BA assistant
         env:
           JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
