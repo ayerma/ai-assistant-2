@@ -1,5 +1,8 @@
 package com.ayerma.assistant;
 
+import com.ayerma.assistant.client.BaAssistantClient;
+import com.ayerma.assistant.client.cli.GitHubCopilotCliClient;
+import com.ayerma.assistant.client.models.GitHubModelsClient;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import java.io.IOException;
@@ -18,10 +21,20 @@ public final class BaAssistantRunner {
         String jiraEmail = Env.required("JIRA_EMAIL");
         String jiraApiToken = Env.required("JIRA_API_TOKEN");
 
+        // Determine which client to use
+        boolean useModelsApi = Env.optional("USE_MODELS_API", "true").equalsIgnoreCase("true");
+        System.out.println("[INFO] Client mode: " + (useModelsApi ? "GitHub Models API" : "GitHub Copilot CLI"));
+
         String modelsEndpoint = Env.optional("MODELS_ENDPOINT", "https://models.inference.ai.azure.com");
-        String modelsApiKey = Env.required("MODELS_TOKEN");
+        String modelsApiKey = Env.optional("MODELS_TOKEN", null);
         String model = Env.optional("MODELS_MODEL", "gpt-4o-mini");
-        System.out.println("[INFO] Using model: " + model + " at " + modelsEndpoint);
+        String cliCommand = Env.optional("COPILOT_CLI_COMMAND", "copilot");
+
+        if (useModelsApi) {
+            System.out.println("[INFO] Using model: " + model + " at " + modelsEndpoint);
+        } else {
+            System.out.println("[INFO] Using CLI command: " + cliCommand);
+        }
 
         String instructionsPath = Env.optional("BA_INSTRUCTIONS_PATH", "instructions/platform/roles/ba-role.md");
         String technicalReqPath = Env.optional("TECHNICAL_REQUIREMENTS_PATH",
@@ -31,7 +44,7 @@ public final class BaAssistantRunner {
         System.out.println("[INFO] Loading instructions from: " + instructionsPath);
         String systemPrompt = loadSystemPrompt(instructionsPath, technicalReqPath);
 
-        HttpJson http = new HttpJson();
+        HttpJson jiraHttp = new HttpJson();
 
         // Check if summary and description are provided to skip Jira API call
         String providedSummary = Env.optional("JIRA_ISSUE_SUMMARY", null);
@@ -45,16 +58,29 @@ public final class BaAssistantRunner {
         } else {
             // Fetch from Jira (existing behavior)
             System.out.println("[INFO] Fetching issue details from Jira API...");
-            JiraClient jira = new JiraClient(http, jiraBaseUrl, jiraEmail, jiraApiToken);
+            JiraClient jira = new JiraClient(jiraHttp, jiraBaseUrl, jiraEmail, jiraApiToken);
             JsonNode issue = jira.getIssue(issueKey);
             System.out.println("[INFO] Successfully fetched issue from Jira");
             userPrompt = BaPromptBuilder.buildUserPromptFromJiraIssue(issue);
         }
 
-        System.out.println("[INFO] Calling AI model to generate BA output...");
-        GitHubModelsClient models = new GitHubModelsClient(http, modelsEndpoint, modelsApiKey, model);
-        String assistantOutput = models.runBaAssistant(systemPrompt, userPrompt);
-        System.out.println("[INFO] Received response from AI model");
+        System.out.println("[INFO] Calling AI to generate BA output...");
+
+        // Create appropriate client based on flag
+        BaAssistantClient client;
+        if (useModelsApi) {
+            if (modelsApiKey == null || modelsApiKey.isBlank()) {
+                throw new IllegalStateException("MODELS_TOKEN is required when USE_MODELS_API=true");
+            }
+            HttpJson modelsHttp = new HttpJson();
+            client = new GitHubModelsClient(modelsHttp, modelsEndpoint, modelsApiKey, model);
+        } else {
+            client = new GitHubCopilotCliClient(cliCommand);
+        }
+
+        String assistantOutput = client.runBaAssistant(systemPrompt, userPrompt);
+        System.out.println("[INFO] Received response from AI");
+        System.out.println("[DEBUG] AI Response:\n" + assistantOutput);
 
         // Validate that output is JSON.
         System.out.println("[INFO] Validating and formatting JSON output...");

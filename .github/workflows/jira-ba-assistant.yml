@@ -43,10 +43,16 @@ jobs:
           JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
 
-          # GitHub Models
+          # Client configuration
+          USE_MODELS_API: ${{ vars.USE_MODELS_API || 'true' }}
+
+          # GitHub Models (when USE_MODELS_API=true)
           MODELS_TOKEN: ${{ secrets.MODELS_TOKEN }}
           MODELS_ENDPOINT: ${{ vars.MODELS_ENDPOINT }}
           MODELS_MODEL: ${{ vars.MODELS_MODEL }}
+
+          # GitHub Copilot CLI (when USE_MODELS_API=false)
+          COPILOT_CLI_COMMAND: ${{ vars.COPILOT_CLI_COMMAND || 'copilot' }}
 
           BA_INSTRUCTIONS_PATH: instructions/platform/roles/ba-role.md
           TECHNICAL_REQUIREMENTS_PATH: instructions/platform/technical/technical-requirements.md
