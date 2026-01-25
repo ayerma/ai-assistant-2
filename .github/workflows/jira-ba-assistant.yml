@@ -100,6 +100,7 @@ jobs:
           # GitHub Copilot CLI configuration (when USE_MODELS_API=false)
           # CLI is automatically installed if USE_MODELS_API=false
           COPILOT_CLI_COMMAND: ${{ vars.COPILOT_CLI_COMMAND || 'copilot' }}
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
 
           BA_INSTRUCTIONS_PATH: instructions/platform/roles/ba-role.md
           TECHNICAL_REQUIREMENTS_PATH: instructions/platform/technical/technical-requirements.md
