@@ -38,13 +38,29 @@ jobs:
         run: mvn -q -DskipTests package
 
       - name: Install GitHub Copilot CLI
-        if: ${{ vars.USE_MODELS_API == 'false' }}
+        if: ${{ vars.USE_MODELS_API != 'true' && vars.USE_MODELS_API != '' }}
         run: |
-          echo "Installing GitHub Copilot CLI..."
+          echo "=== Installing GitHub Copilot CLI ==="
+          echo "USE_MODELS_API value: '${{ vars.USE_MODELS_API }}'"
+
+          # Install Copilot CLI
           npm install -g @githubnext/github-copilot-cli
-          echo "Installed commands:"
-          which github-copilot-cli || echo "github-copilot-cli not found"
-          which copilot || echo "copilot not found"
+
+          # Show npm global bin path
+          echo "npm global bin: $(npm bin -g)"
+          export PATH="$(npm bin -g):$PATH"
+
+          # List installed global packages
+          echo "=== Installed npm global packages ==="
+          npm list -g --depth=0
+
+          # Check for available commands
+          echo "=== Checking available commands ==="
+          ls -la $(npm bin -g) | grep -i copilot || echo "No copilot commands found in npm bin"
+
+          # Verify copilot command
+          echo "=== Testing copilot command ==="
+          which copilot && copilot --version || echo "copilot command not available"
 
       - name: Run BA assistant
         env:
