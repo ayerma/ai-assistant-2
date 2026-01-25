@@ -45,7 +45,7 @@ jobs:
           echo "USE_MODELS_API value: '${{ vars.USE_MODELS_API }}'"
 
           # Install Copilot CLI
-          npm install -g @githubnext/github-copilot-cli
+          npm install -g @github/copilot
 
           # Show npm global bin path and add to GITHUB_PATH (persists across steps)
           NPM_BIN=$(npm bin -g)
