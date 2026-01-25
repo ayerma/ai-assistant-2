@@ -41,10 +41,11 @@ public final class GitHubCopilotCliClient implements BaAssistantClient {
             process = pb.start();
         } catch (IOException e) {
             throw new IOException(
-                "Failed to execute CLI command '" + cliCommand + "'. " +
-                "Make sure GitHub Copilot CLI is installed and accessible in PATH. " +
-                "Alternatively, set USE_MODELS_API=true to use the API instead. " +
-                "Original error: " + e.getMessage(), e);
+                    "Failed to execute CLI command '" + cliCommand + "'. " +
+                            "Make sure GitHub Copilot CLI is installed and accessible in PATH. " +
+                            "Alternatively, set USE_MODELS_API=true to use the API instead. " +
+                            "Original error: " + e.getMessage(),
+                    e);
         }
 
         // Read the output

@@ -40,6 +40,7 @@ jobs:
       - name: Install GitHub Copilot CLI
         if: ${{ vars.USE_MODELS_API != 'true' && vars.USE_MODELS_API != '' }}
         run: |
+          set +e  # Don't exit on errors during verification
           echo "=== Installing GitHub Copilot CLI ==="
           echo "USE_MODELS_API value: '${{ vars.USE_MODELS_API }}'"
 
@@ -55,13 +56,24 @@ jobs:
           echo "=== Installed npm global packages ==="
           npm list -g --depth=0
 
-          # Check for available commands
-          echo "=== Checking available commands ==="
-          ls -la $NPM_BIN | grep -i copilot || echo "No copilot commands found in npm bin"
+          # Show ALL files in npm bin directory
+          echo "=== All files in npm bin ==="
+          ls -la $NPM_BIN
 
-          # Verify copilot command (using full path since GITHUB_PATH won't take effect until next step)
-          echo "=== Testing copilot command ==="
-          $NPM_BIN/copilot --version || echo "copilot command not available"
+          # Check for available copilot-related commands
+          echo "=== Looking for copilot commands ==="
+          ls -la $NPM_BIN | grep -i copilot || echo "No copilot commands found"
+
+          # Try different possible command names
+          echo "=== Testing possible command names ==="
+          for cmd in copilot github-copilot github-copilot-cli ghcs; do
+            if [ -f "$NPM_BIN/$cmd" ]; then
+              echo "Found: $cmd"
+              $NPM_BIN/$cmd --version 2>&1 || echo "$cmd --version failed"
+            fi
+          done
+
+          echo "=== Install step complete ==="
 
       - name: Authenticate Copilot CLI
         if: ${{ vars.USE_MODELS_API != 'true' && vars.USE_MODELS_API != '' }}
