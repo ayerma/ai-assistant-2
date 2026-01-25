@@ -36,7 +36,16 @@ public final class GitHubCopilotCliClient implements BaAssistantClient {
 
         System.out.println("[INFO] Executing CLI command: " + cliCommand + " --allow-all-tools -p \"<prompt>\"");
 
-        Process process = pb.start();
+        Process process;
+        try {
+            process = pb.start();
+        } catch (IOException e) {
+            throw new IOException(
+                "Failed to execute CLI command '" + cliCommand + "'. " +
+                "Make sure GitHub Copilot CLI is installed and accessible in PATH. " +
+                "Alternatively, set USE_MODELS_API=true to use the API instead. " +
+                "Original error: " + e.getMessage(), e);
+        }
 
         // Read the output
         StringBuilder output = new StringBuilder();
