@@ -46,9 +46,10 @@ jobs:
           # Install Copilot CLI
           npm install -g @githubnext/github-copilot-cli
 
-          # Show npm global bin path
-          echo "npm global bin: $(npm bin -g)"
-          export PATH="$(npm bin -g):$PATH"
+          # Show npm global bin path and add to GITHUB_PATH (persists across steps)
+          NPM_BIN=$(npm bin -g)
+          echo "npm global bin: $NPM_BIN"
+          echo "$NPM_BIN" >> $GITHUB_PATH
 
           # List installed global packages
           echo "=== Installed npm global packages ==="
@@ -56,11 +57,11 @@ jobs:
 
           # Check for available commands
           echo "=== Checking available commands ==="
-          ls -la $(npm bin -g) | grep -i copilot || echo "No copilot commands found in npm bin"
+          ls -la $NPM_BIN | grep -i copilot || echo "No copilot commands found in npm bin"
 
-          # Verify copilot command
+          # Verify copilot command (using full path since GITHUB_PATH won't take effect until next step)
           echo "=== Testing copilot command ==="
-          which copilot && copilot --version || echo "copilot command not available"
+          $NPM_BIN/copilot --version || echo "copilot command not available"
 
       - name: Run BA assistant
         env:
