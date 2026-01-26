@@ -45,14 +45,26 @@ public final class GitHubCopilotCliClient implements BaAssistantClient {
         }
 
         if (authToken != null && !authToken.isEmpty()) {
-            // Set all three environment variables that Copilot CLI might check
-            pb.environment().put("COPILOT_GITHUB_TOKEN", authToken);
-            pb.environment().put("GH_TOKEN", authToken);
-            pb.environment().put("GITHUB_TOKEN", authToken);
+            // Run command through shell with explicit export to ensure env vars are visible
+            // This works around potential subprocess environment isolation issues
+            command.clear();
+            command.add("/bin/bash");
+            command.add("-c");
+            command.add("export GITHUB_TOKEN='" + authToken + "' && " +
+                    "export GH_TOKEN='" + authToken + "' && " +
+                    "export COPILOT_GITHUB_TOKEN='" + authToken + "' && " +
+                    cliCommand + " --allow-all-tools -p \"$PROMPT\"");
+            pb = new ProcessBuilder(command);
+            pb.environment().put("PROMPT", combinedPrompt);
+            pb.redirectErrorStream(true);
+
             System.out.println("[INFO] Authentication token provided (length: " + authToken.length() + " chars)");
-            System.out.println("[DEBUG] Token prefix: " + authToken.substring(0, Math.min(4, authToken.length())) + "...");
+            System.out.println(
+                    "[DEBUG] Token prefix: " + authToken.substring(0, Math.min(4, authToken.length())) + "...");
+            System.out.println("[INFO] Running via bash with exported env vars");
         } else {
-            System.out.println("[WARN] No authentication token found in COPILOT_GITHUB_TOKEN, GH_TOKEN, or GITHUB_TOKEN");
+            System.out
+                    .println("[WARN] No authentication token found in COPILOT_GITHUB_TOKEN, GH_TOKEN, or GITHUB_TOKEN");
         }
 
         System.out.println("[INFO] Executing CLI command: " + cliCommand + " --allow-all-tools -p \"<prompt>\"");
