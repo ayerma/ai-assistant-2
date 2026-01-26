@@ -137,18 +137,15 @@ jobs:
         if: ${{ vars.USE_MODELS_API == 'false' }}
         run: |
           echo "=== Using Copilot CLI ==="
-
-          # Verify gh authentication
-          gh auth status
-
-          # Authenticate copilot CLI directly using gh token
-          echo "${{ secrets.COPILOT_GITHUB_TOKEN }}" | copilot /login --with-token || true
-
-          # Call copilot with the generated prompt
+          
+          # Call copilot with explicit env vars
           echo "Calling: copilot --allow-all-tools with prompt from ba-prompt.txt"
-          GITHUB_TOKEN="${{ secrets.COPILOT_GITHUB_TOKEN }}" \
-          GH_TOKEN="${{ secrets.COPILOT_GITHUB_TOKEN }}" \
-          COPILOT_GITHUB_TOKEN="${{ secrets.COPILOT_GITHUB_TOKEN }}" \
+          export GITHUB_TOKEN="${{ secrets.COPILOT_GITHUB_TOKEN }}"
+          export GH_TOKEN="${{ secrets.COPILOT_GITHUB_TOKEN }}"
+          export COPILOT_GITHUB_TOKEN="${{ secrets.COPILOT_GITHUB_TOKEN }}"
+          
+          copilot --allow-all-tools -p "$(cat ba-prompt.txt)" > ba-output-raw.txt
+          
           echo "=== Extracting JSON from Copilot output ==="
           python3 -c "
           import re
