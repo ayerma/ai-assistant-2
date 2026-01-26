@@ -64,21 +64,25 @@ public final class BaAssistantRunner {
             userPrompt = BaPromptBuilder.buildUserPromptFromJiraIssue(issue);
         }
 
-        System.out.println("[INFO] Calling AI to generate BA output...");
+        // Always write the prompt to file first
+        String promptOutputPath = Env.optional("PROMPT_OUTPUT_PATH", "ba-prompt.txt");
+        String combinedPrompt = systemPrompt + "\n\n" + userPrompt;
+        Files.writeString(Path.of(promptOutputPath), combinedPrompt, StandardCharsets.UTF_8);
+        System.out.println("[INFO] Wrote combined prompt to: " + promptOutputPath);
 
-        // Check if we should just output the prompt instead of calling the client
+        // Check if we should just output the prompt and exit (CLI mode handles
+        // execution in workflow)
         boolean outputPromptOnly = Env.optional("OUTPUT_PROMPT_ONLY", "false").equalsIgnoreCase("true");
 
         if (outputPromptOnly) {
-            System.out.println("[INFO] OUTPUT_PROMPT_ONLY mode - writing prompt to file");
-            String promptOutputPath = Env.optional("PROMPT_OUTPUT_PATH", "ba-prompt.txt");
-            String combinedPrompt = systemPrompt + "\n\n" + userPrompt;
-            Files.writeString(Path.of(promptOutputPath), combinedPrompt, StandardCharsets.UTF_8);
-            System.out.println("[SUCCESS] Wrote combined prompt to: " + promptOutputPath);
+            System.out.println("[INFO] OUTPUT_PROMPT_ONLY mode - prompt written, exiting");
+            System.out.println("[INFO] Workflow will call Copilot CLI with the prompt");
             return;
         }
 
-        // Create appropriate client based on flag
+        System.out.println("[INFO] Calling AI to generate BA output...");
+
+        // Create appropriate client based on flag (API mode only reaches here)
         BaAssistantClient client;
         if (useModelsApi) {
             if (modelsApiKey == null || modelsApiKey.isBlank()) {

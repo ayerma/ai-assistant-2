@@ -38,7 +38,7 @@ jobs:
         run: mvn -q -DskipTests package
 
       - name: Install GitHub Copilot CLI
-        if: ${{ vars.USE_MODELS_API != 'true' && vars.USE_MODELS_API != '' }}
+        if: ${{ vars.USE_MODELS_API == 'false' }}
         run: |
           set +e  # Don't exit on errors during verification
           echo "=== Installing GitHub Copilot CLI ==="
@@ -78,7 +78,7 @@ jobs:
           echo "=== Install step complete ==="
 
       - name: Authenticate Copilot CLI
-        if: ${{ vars.USE_MODELS_API != 'true' && vars.USE_MODELS_API != '' }}
+        if: ${{ vars.USE_MODELS_API == 'false' }}
         run: |
           echo "=== Authenticating GitHub Copilot CLI ==="
           if [ -z "${{ secrets.COPILOT_GITHUB_TOKEN }}" ]; then
@@ -92,7 +92,7 @@ jobs:
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
 
-      - name: Run BA assistant
+      - name: Generate prompt
         env:
           JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
           JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
@@ -100,54 +100,58 @@ jobs:
 
           USE_MODELS_API: ${{ vars.USE_MODELS_API || 'true' }}
 
-          # GitHub Models API configuration (when USE_MODELS_API=true)
-          MODELS_TOKEN: ${{ secrets.MODELS_TOKEN }}
-          MODELS_ENDPOINT: ${{ vars.MODELS_ENDPOINT }}
-          MODELS_MODEL: ${{ vars.MODELS_MODEL }}
-
           BA_INSTRUCTIONS_PATH: instructions/platform/roles/ba-role.md
           TECHNICAL_REQUIREMENTS_PATH: instructions/platform/technical/technical-requirements.md
-          BA_OUTPUT_PATH: ba-output.json
 
           JIRA_ISSUE_KEY: ${{ inputs.ticket_id }}
           JIRA_ISSUE_SUMMARY: ${{ inputs.ticket_summary }}
           JIRA_ISSUE_DESCRIPTION: ${{ inputs.ticket_description }}
 
-          # For CLI mode: generate prompt only, then call copilot from workflow
-          OUTPUT_PROMPT_ONLY: ${{ vars.USE_MODELS_API != 'true' && vars.USE_MODELS_API != '' }}
+          # Always generate prompt first
+          OUTPUT_PROMPT_ONLY: true
           PROMPT_OUTPUT_PATH: ba-prompt.txt
+        run: |
+          echo "=== Generating BA assistant prompt ==="
+          java -jar target/ai-assistant-2-automation-0.1.0-all.jar
 
-          # Copilot CLI authentication (for CLI mode)
+      - name: Call GitHub Models API
+        if: ${{ vars.USE_MODELS_API == 'true' || vars.USE_MODELS_API == '' }}
+        env:
+          MODELS_TOKEN: ${{ secrets.MODELS_TOKEN }}
+          MODELS_ENDPOINT: ${{ vars.MODELS_ENDPOINT }}
+          MODELS_MODEL: ${{ vars.MODELS_MODEL }}
+
+          USE_MODELS_API: true
+          OUTPUT_PROMPT_ONLY: false
+          PROMPT_OUTPUT_PATH: ba-prompt.txt
+          BA_OUTPUT_PATH: ba-output.json
+
+          JIRA_ISSUE_KEY: ${{ inputs.ticket_id }}
+          JIRA_ISSUE_SUMMARY: ${{ inputs.ticket_summary }}
+          JIRA_ISSUE_DESCRIPTION: ${{ inputs.ticket_description }}
+        run: |
+          echo "=== Using GitHub Models API ==="
+          java -jar target/ai-assistant-2-automation-0.1.0-all.jar
+
+      - name: Call Copilot CLI
+        if: ${{ vars.USE_MODELS_API != 'true' && vars.USE_MODELS_API != '' }}
+        env:
           GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
           GH_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
         run: |
-          if [ "$USE_MODELS_API" = "true" ]; then
-            echo "=== Using GitHub Models API directly from Java ==="
-            java -jar target/ai-assistant-2-automation-0.1.0-all.jar
-          else
-            echo "=== Generating prompt for Copilot CLI ==="
-            java -jar target/ai-assistant-2-automation-0.1.0-all.jar
-            
-            echo "=== Calling Copilot CLI from workflow ==="
-            echo "Checking environment variables..."
-            echo "GITHUB_TOKEN length: ${#GITHUB_TOKEN}"
-            echo "GH_TOKEN length: ${#GH_TOKEN}"
-            echo "COPILOT_GITHUB_TOKEN length: ${#COPILOT_GITHUB_TOKEN}"
-            
-            # Verify copilot command exists
-            which copilot || echo "ERROR: copilot command not found in PATH"
-            
-            # Try calling copilot with explicit env
-            export GITHUB_TOKEN="${GITHUB_TOKEN}"
-            export GH_TOKEN="${GH_TOKEN}"
-            export COPILOT_GITHUB_TOKEN="${COPILOT_GITHUB_TOKEN}"
-            
-            copilot --allow-all-tools -p "$(cat ba-prompt.txt)" > ba-output-raw.txt
-            
-            echo "=== Extracting JSON from Copilot output ==="
-            # Extract JSON block from copilot output (may contain extra text)
-            python3 -c "
+          echo "=== Using Copilot CLI ==="
+
+          # Re-authenticate gh to ensure copilot can use it
+          echo "$COPILOT_GITHUB_TOKEN" | gh auth login --with-token
+          gh auth status
+
+          # Call copilot with the generated prompt
+          echo "Calling: copilot --allow-all-tools with prompt from ba-prompt.txt"
+          copilot --allow-all-tools -p "$(cat ba-prompt.txt)" > ba-output-raw.txt
+
+          echo "=== Extracting JSON from Copilot output ==="
+          python3 -c "
           import re
           import json
 
@@ -166,7 +170,6 @@ jobs:
               print('[ERROR] No JSON found in copilot output')
               exit(1)
           "
-          fi
 
       - name: Upload result
         uses: actions/upload-artifact@v4
