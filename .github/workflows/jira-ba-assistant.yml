@@ -48,7 +48,9 @@ jobs:
           npm install -g @github/copilot
 
           # Show npm global bin path and add to GITHUB_PATH (persists across steps)
-          NPM_BIN=$(npm bin -g)
+          NPM_PREFIX=$(npm prefix -g)
+          NPM_BIN="$NPM_PREFIX/bin"
+          echo "npm global prefix: $NPM_PREFIX"
           echo "npm global bin: $NPM_BIN"
           echo "$NPM_BIN" >> $GITHUB_PATH
 
