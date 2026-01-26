@@ -40,57 +40,14 @@ jobs:
       - name: Install GitHub Copilot CLI
         if: ${{ vars.USE_MODELS_API == 'false' }}
         run: |
-          set +e  # Don't exit on errors during verification
-          echo "=== Installing GitHub Copilot CLI ==="
-          echo "USE_MODELS_API value: '${{ vars.USE_MODELS_API }}'"
-
-          # Install Copilot CLI
+          echo "Installing GitHub Copilot CLI..."
           npm install -g @github/copilot
-
-          # Show npm global bin path and add to GITHUB_PATH (persists across steps)
+          
+          # Add npm bin to PATH
           NPM_PREFIX=$(npm prefix -g)
-          NPM_BIN="$NPM_PREFIX/bin"
-          echo "npm global prefix: $NPM_PREFIX"
-          echo "npm global bin: $NPM_BIN"
-          echo "$NPM_BIN" >> $GITHUB_PATH
-
-          # List installed global packages
-          echo "=== Installed npm global packages ==="
-          npm list -g --depth=0
-
-          # Show ALL files in npm bin directory
-          echo "=== All files in npm bin ==="
-          ls -la $NPM_BIN
-
-          # Check for available copilot-related commands
-          echo "=== Looking for copilot commands ==="
-          ls -la $NPM_BIN | grep -i copilot || echo "No copilot commands found"
-
-          # Try different possible command names
-          echo "=== Testing possible command names ==="
-          for cmd in copilot github-copilot github-copilot-cli ghcs; do
-            if [ -f "$NPM_BIN/$cmd" ]; then
-              echo "Found: $cmd"
-              $NPM_BIN/$cmd --version 2>&1 || echo "$cmd --version failed"
-            fi
-          done
-
-          echo "=== Install step complete ==="
-
-      - name: Authenticate Copilot CLI
-        if: ${{ vars.USE_MODELS_API == 'false' }}
-        run: |
-          echo "=== Authenticating GitHub Copilot CLI ==="
-          if [ -z "${{ secrets.COPILOT_GITHUB_TOKEN }}" ]; then
-            echo "ERROR: COPILOT_GITHUB_TOKEN secret is not set!"
-            exit 1
-          else
-            echo "COPILOT_GITHUB_TOKEN is set (length: ${#COPILOT_GITHUB_TOKEN} chars)"
-          fi
-          echo "${{ secrets.COPILOT_GITHUB_TOKEN }}" | gh auth login --with-token
-          gh auth status
-        env:
-          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+          echo "$NPM_PREFIX/bin" >> $GITHUB_PATH
+          
+          echo "Copilot CLI installed successfully"
 
       - name: Generate prompt
         env:
@@ -111,7 +68,7 @@ jobs:
           OUTPUT_PROMPT_ONLY: true
           PROMPT_OUTPUT_PATH: ba-prompt.txt
         run: |
-          echo "=== Generating BA assistant prompt ==="
+          echo "Generating BA assistant prompt..."
           java -jar target/ai-assistant-2-automation-0.1.0-all.jar
 
       - name: Call GitHub Models API
@@ -130,23 +87,20 @@ jobs:
           JIRA_ISSUE_SUMMARY: ${{ inputs.ticket_summary }}
           JIRA_ISSUE_DESCRIPTION: ${{ inputs.ticket_description }}
         run: |
-          echo "=== Using GitHub Models API ==="
+          echo "Calling GitHub Models API..."
           java -jar target/ai-assistant-2-automation-0.1.0-all.jar
 
       - name: Call Copilot CLI
         if: ${{ vars.USE_MODELS_API == 'false' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
         run: |
-          echo "=== Using Copilot CLI ==="
-          
-          # Call copilot with explicit env vars
-          echo "Calling: copilot --allow-all-tools with prompt from ba-prompt.txt"
-          export GITHUB_TOKEN="${{ secrets.COPILOT_GITHUB_TOKEN }}"
-          export GH_TOKEN="${{ secrets.COPILOT_GITHUB_TOKEN }}"
-          export COPILOT_GITHUB_TOKEN="${{ secrets.COPILOT_GITHUB_TOKEN }}"
-          
+          echo "Calling Copilot CLI..."
           copilot --allow-all-tools -p "$(cat ba-prompt.txt)" > ba-output-raw.txt
-          
-          echo "=== Extracting JSON from Copilot output ==="
+
+          echo "Extracting JSON from output..."
           python3 -c "
           import re
           import json
