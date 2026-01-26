@@ -98,19 +98,12 @@ jobs:
           JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
 
-          # Client configuration (defaults to API mode)
-          # Set USE_MODELS_API=false to use Copilot CLI
           USE_MODELS_API: ${{ vars.USE_MODELS_API || 'true' }}
 
           # GitHub Models API configuration (when USE_MODELS_API=true)
           MODELS_TOKEN: ${{ secrets.MODELS_TOKEN }}
           MODELS_ENDPOINT: ${{ vars.MODELS_ENDPOINT }}
           MODELS_MODEL: ${{ vars.MODELS_MODEL }}
-
-          # GitHub Copilot CLI configuration (when USE_MODELS_API=false)
-          # CLI is automatically installed if USE_MODELS_API=false
-          COPILOT_CLI_COMMAND: ${{ vars.COPILOT_CLI_COMMAND || 'copilot' }}
-          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
 
           BA_INSTRUCTIONS_PATH: instructions/platform/roles/ba-role.md
           TECHNICAL_REQUIREMENTS_PATH: instructions/platform/technical/technical-requirements.md
@@ -119,8 +112,47 @@ jobs:
           JIRA_ISSUE_KEY: ${{ inputs.ticket_id }}
           JIRA_ISSUE_SUMMARY: ${{ inputs.ticket_summary }}
           JIRA_ISSUE_DESCRIPTION: ${{ inputs.ticket_description }}
+          
+          # For CLI mode: generate prompt only, then call copilot from workflow
+          OUTPUT_PROMPT_ONLY: ${{ vars.USE_MODELS_API != 'true' && vars.USE_MODELS_API != '' }}
+          PROMPT_OUTPUT_PATH: ba-prompt.txt
         run: |
-          java -jar target/ai-assistant-2-automation-0.1.0-all.jar
+          if [ "$USE_MODELS_API" = "true" ]; then
+            echo "=== Using GitHub Models API directly from Java ==="
+            java -jar target/ai-assistant-2-automation-0.1.0-all.jar
+          else
+            echo "=== Generating prompt for Copilot CLI ==="
+            java -jar target/ai-assistant-2-automation-0.1.0-all.jar
+            
+            echo "=== Calling Copilot CLI from workflow ==="
+            copilot --allow-all-tools -p "$(cat ba-prompt.txt)" > ba-output-raw.txt
+            
+            echo "=== Extracting JSON from Copilot output ==="
+            # Extract JSON block from copilot output (may contain extra text)
+            python3 -c "
+          import re
+          import json
+          
+          with open('ba-output-raw.txt', 'r') as f:
+              content = f.read()
+          
+          # Try to find JSON block
+          json_match = re.search(r'\{.*\}', content, re.DOTALL)
+          if json_match:
+              json_str = json_match.group(0)
+              parsed = json.loads(json_str)
+              with open('ba-output.json', 'w') as out:
+                  json.dump(parsed, out, indent=2)
+              print('[SUCCESS] Extracted and wrote JSON output')
+          else:
+              print('[ERROR] No JSON found in copilot output')
+              exit(1)
+          "
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
 
       - name: Upload result
         uses: actions/upload-artifact@v4

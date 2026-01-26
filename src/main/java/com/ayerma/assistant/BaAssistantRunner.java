@@ -66,6 +66,18 @@ public final class BaAssistantRunner {
 
         System.out.println("[INFO] Calling AI to generate BA output...");
 
+        // Check if we should just output the prompt instead of calling the client
+        boolean outputPromptOnly = Env.optional("OUTPUT_PROMPT_ONLY", "false").equalsIgnoreCase("true");
+
+        if (outputPromptOnly) {
+            System.out.println("[INFO] OUTPUT_PROMPT_ONLY mode - writing prompt to file");
+            String promptOutputPath = Env.optional("PROMPT_OUTPUT_PATH", "ba-prompt.txt");
+            String combinedPrompt = systemPrompt + "\n\n" + userPrompt;
+            Files.writeString(Path.of(promptOutputPath), combinedPrompt, StandardCharsets.UTF_8);
+            System.out.println("[SUCCESS] Wrote combined prompt to: " + promptOutputPath);
+            return;
+        }
+
         // Create appropriate client based on flag
         BaAssistantClient client;
         if (useModelsApi) {
