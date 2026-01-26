@@ -130,6 +130,19 @@ jobs:
             java -jar target/ai-assistant-2-automation-0.1.0-all.jar
             
             echo "=== Calling Copilot CLI from workflow ==="
+            echo "Checking environment variables..."
+            echo "GITHUB_TOKEN length: ${#GITHUB_TOKEN}"
+            echo "GH_TOKEN length: ${#GH_TOKEN}"
+            echo "COPILOT_GITHUB_TOKEN length: ${#COPILOT_GITHUB_TOKEN}"
+            
+            # Verify copilot command exists
+            which copilot || echo "ERROR: copilot command not found in PATH"
+            
+            # Try calling copilot with explicit env
+            export GITHUB_TOKEN="${GITHUB_TOKEN}"
+            export GH_TOKEN="${GH_TOKEN}"
+            export COPILOT_GITHUB_TOKEN="${COPILOT_GITHUB_TOKEN}"
+            
             copilot --allow-all-tools -p "$(cat ba-prompt.txt)" > ba-output-raw.txt
             
             echo "=== Extracting JSON from Copilot output ==="
