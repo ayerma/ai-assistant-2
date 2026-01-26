@@ -59,8 +59,6 @@ public final class GitHubCopilotCliClient implements BaAssistantClient {
             pb.redirectErrorStream(true);
 
             System.out.println("[INFO] Authentication token provided (length: " + authToken.length() + " chars)");
-            System.out.println(
-                    "[DEBUG] Token prefix: " + authToken.substring(0, Math.min(4, authToken.length())) + "...");
             System.out.println("[INFO] Running via bash with exported env vars");
         } else {
             System.out
