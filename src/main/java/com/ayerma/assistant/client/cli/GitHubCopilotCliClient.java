@@ -37,11 +37,22 @@ public final class GitHubCopilotCliClient implements BaAssistantClient {
         // Pass authentication token to CLI process
         // Copilot CLI accepts COPILOT_GITHUB_TOKEN, GH_TOKEN, or GITHUB_TOKEN
         String authToken = System.getenv("COPILOT_GITHUB_TOKEN");
+        if (authToken == null || authToken.isEmpty()) {
+            authToken = System.getenv("GH_TOKEN");
+        }
+        if (authToken == null || authToken.isEmpty()) {
+            authToken = System.getenv("GITHUB_TOKEN");
+        }
+
         if (authToken != null && !authToken.isEmpty()) {
+            // Set all three environment variables that Copilot CLI might check
             pb.environment().put("COPILOT_GITHUB_TOKEN", authToken);
-            System.out.println("[INFO] Authentication token provided via COPILOT_GITHUB_TOKEN");
+            pb.environment().put("GH_TOKEN", authToken);
+            pb.environment().put("GITHUB_TOKEN", authToken);
+            System.out.println("[INFO] Authentication token provided (length: " + authToken.length() + " chars)");
+            System.out.println("[DEBUG] Token prefix: " + authToken.substring(0, Math.min(4, authToken.length())) + "...");
         } else {
-            System.out.println("[WARN] No COPILOT_GITHUB_TOKEN found in environment");
+            System.out.println("[WARN] No authentication token found in COPILOT_GITHUB_TOKEN, GH_TOKEN, or GITHUB_TOKEN");
         }
 
         System.out.println("[INFO] Executing CLI command: " + cliCommand + " --allow-all-tools -p \"<prompt>\"");
