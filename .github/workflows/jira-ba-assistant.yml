@@ -79,8 +79,16 @@ jobs:
         if: ${{ vars.USE_MODELS_API != 'true' && vars.USE_MODELS_API != '' }}
         run: |
           echo "=== Authenticating GitHub Copilot CLI ==="
+          if [ -z "${{ secrets.COPILOT_GITHUB_TOKEN }}" ]; then
+            echo "ERROR: COPILOT_GITHUB_TOKEN secret is not set!"
+            exit 1
+          else
+            echo "COPILOT_GITHUB_TOKEN is set (length: ${#COPILOT_GITHUB_TOKEN} chars)"
+          fi
           echo "${{ secrets.COPILOT_GITHUB_TOKEN }}" | gh auth login --with-token
           gh auth status
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
 
       - name: Run BA assistant
         env:
