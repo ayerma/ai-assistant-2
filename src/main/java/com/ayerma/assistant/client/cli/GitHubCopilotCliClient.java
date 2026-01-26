@@ -34,6 +34,16 @@ public final class GitHubCopilotCliClient implements BaAssistantClient {
         ProcessBuilder pb = new ProcessBuilder(command);
         pb.redirectErrorStream(true);
 
+        // Pass authentication token to CLI process
+        // Copilot CLI accepts COPILOT_GITHUB_TOKEN, GH_TOKEN, or GITHUB_TOKEN
+        String authToken = System.getenv("COPILOT_GITHUB_TOKEN");
+        if (authToken != null && !authToken.isEmpty()) {
+            pb.environment().put("COPILOT_GITHUB_TOKEN", authToken);
+            System.out.println("[INFO] Authentication token provided via COPILOT_GITHUB_TOKEN");
+        } else {
+            System.out.println("[WARN] No COPILOT_GITHUB_TOKEN found in environment");
+        }
+
         System.out.println("[INFO] Executing CLI command: " + cliCommand + " --allow-all-tools -p \"<prompt>\"");
 
         Process process;
