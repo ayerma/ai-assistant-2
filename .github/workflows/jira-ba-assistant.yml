@@ -134,18 +134,17 @@ jobs:
           java -jar target/ai-assistant-2-automation-0.1.0-all.jar
 
       - name: Call Copilot CLI
-        if: ${{ vars.USE_MODELS_API != 'true' && vars.USE_MODELS_API != '' }}
+        if: ${{ vars.USE_MODELS_API == 'false' }}
         env:
           GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
           GH_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
         run: |
           echo "=== Using Copilot CLI ==="
-
-          # Re-authenticate gh to ensure copilot can use it
-          echo "$COPILOT_GITHUB_TOKEN" | gh auth login --with-token
+          
+          # Verify authentication from previous step
           gh auth status
-
+          
           # Call copilot with the generated prompt
           echo "Calling: copilot --allow-all-tools with prompt from ba-prompt.txt"
           copilot --allow-all-tools -p "$(cat ba-prompt.txt)" > ba-output-raw.txt
