@@ -112,10 +112,15 @@ jobs:
           JIRA_ISSUE_KEY: ${{ inputs.ticket_id }}
           JIRA_ISSUE_SUMMARY: ${{ inputs.ticket_summary }}
           JIRA_ISSUE_DESCRIPTION: ${{ inputs.ticket_description }}
-          
+
           # For CLI mode: generate prompt only, then call copilot from workflow
           OUTPUT_PROMPT_ONLY: ${{ vars.USE_MODELS_API != 'true' && vars.USE_MODELS_API != '' }}
           PROMPT_OUTPUT_PATH: ba-prompt.txt
+
+          # Copilot CLI authentication (for CLI mode)
+          GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
         run: |
           if [ "$USE_MODELS_API" = "true" ]; then
             echo "=== Using GitHub Models API directly from Java ==="
@@ -132,10 +137,10 @@ jobs:
             python3 -c "
           import re
           import json
-          
+
           with open('ba-output-raw.txt', 'r') as f:
               content = f.read()
-          
+
           # Try to find JSON block
           json_match = re.search(r'\{.*\}', content, re.DOTALL)
           if json_match:
@@ -149,10 +154,6 @@ jobs:
               exit(1)
           "
           fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
-          GH_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
-          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
 
       - name: Upload result
         uses: actions/upload-artifact@v4
