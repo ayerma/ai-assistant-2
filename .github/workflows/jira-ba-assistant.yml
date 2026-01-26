@@ -79,7 +79,7 @@ jobs:
         if: ${{ vars.USE_MODELS_API != 'true' && vars.USE_MODELS_API != '' }}
         run: |
           echo "=== Authenticating GitHub Copilot CLI ==="
-          echo "${{ secrets.COPILOT_PAT }}" | gh auth login --with-token
+          echo "${{ secrets.COPILOT_GITHUB_TOKEN }}" | gh auth login --with-token
           gh auth status
 
       - name: Run BA assistant
@@ -100,7 +100,7 @@ jobs:
           # GitHub Copilot CLI configuration (when USE_MODELS_API=false)
           # CLI is automatically installed if USE_MODELS_API=false
           COPILOT_CLI_COMMAND: ${{ vars.COPILOT_CLI_COMMAND || 'copilot' }}
-          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
 
           BA_INSTRUCTIONS_PATH: instructions/platform/roles/ba-role.md
           TECHNICAL_REQUIREMENTS_PATH: instructions/platform/technical/technical-requirements.md
