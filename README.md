@@ -34,3 +34,30 @@ Optional **GitHub repository variables**:
 - The workflow currently uploads `ba-output.json` as an artifact; you can extend it to post results back to Jira or open a PR.
 - The Jira automation directly triggers the GitHub Actions workflow using workflow dispatch API.
 - The `ticket_summary` and `ticket_description` inputs are optional; if not provided, the runner will fetch from Jira API.
+
+## BA Assistant Features
+
+The BA assistant now includes enhanced decision-making capabilities:
+
+### Autonomous Decision Making
+- The BA assistant makes most technical decisions automatically based on best practices, project requirements, and industry standards
+- Decisions are made for component structure, UI organization, styling, naming conventions, and minor technical choices
+
+### Question Tickets
+- For **business-critical** or **technically-critical** decisions, the BA assistant creates sub-tickets with questions
+- Question tickets have the `[Question]` prefix in the title and are of type `task`
+- These allow stakeholders to make important decisions while the BA assistant handles routine choices
+
+### Ticket Type Classification
+The BA assistant automatically determines the appropriate ticket type:
+- **Epic**: Large features (13+ story points) requiring multiple stories/tasks
+- **Story**: Medium features (3-8 story points) delivering user value
+- **Task**: Small, focused work (1-3 story points)
+
+### Output Schema
+The JSON output includes:
+- `ticket_type`: epic, story, or task
+- `sub_tickets`: Array of question tickets when critical decisions are needed
+- Each question ticket includes context, options, and reasoning for why human input is required
+
+See `instructions/platform/roles/ba-role.md` for detailed examples and guidelines.
