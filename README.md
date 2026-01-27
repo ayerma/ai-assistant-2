@@ -59,5 +59,3 @@ The JSON output includes:
 - `ticket_type`: epic, story, or task
 - `sub_tickets`: Array of question tickets when critical decisions are needed
 - Each question ticket includes context, options, and reasoning for why human input is required
-
-See `instructions/platform/roles/ba-role.md` for detailed examples and guidelines.
