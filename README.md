@@ -14,7 +14,10 @@ There are two components: - Fetches the Jira issue JSON via Jira REST API - Buil
 
 ## GitHub Actions Setup
 
-Workflow: `.github/workflows/jira-ba-assistant.yml`
+Workflows:
+
+- `.github/workflows/jira-ba-assistant.yml`
+- `.github/workflows/jira-tech-assistant.yml`
 
 Add these **GitHub repository secrets**:
 
@@ -27,11 +30,28 @@ Optional **GitHub repository variables**:
 
 - `MODELS_ENDPOINT` (default: `https://models.inference.ai.azure.com`)
 - `MODELS_MODEL` (default: `gpt-4o-mini`)
+- `DEV_INSTRUCTIONS_PATH` (default: `instructions/platform/roles/dev-role.md`)
+- `TARGET_REPO` (format: `owner/repo`, required for Tech Assistant)
+- `TARGET_REF` (default: `main`)
+- `TARGET_REPO_PATH` (default: `target-repo`)
+
+Optional **GitHub repository secrets** (for private target repos):
+
+- `TARGET_REPO_TOKEN` (GitHub token with read access)
+
+## Tech Assistant Workflow
+
+The Tech Assistant workflow generates a code-focused implementation plan using BA + senior developer instructions and the technical requirements.
+
+- Output prompt: `tech-prompt.txt`
+- Output JSON: `tech-output.json`
+- Optional env overrides: `TECH_PROMPT_OUTPUT_PATH`, `TECH_OUTPUT_PATH`
 
 ## Notes
 
-- The BA assistant output format is defined in `instructions/platform/ba-role.md`.
-- The workflow currently uploads `ba-output.json` as an artifact; you can extend it to post results back to Jira or open a PR.
+- The BA assistant output format is defined in `instructions/platform/roles/ba-role.md`.
+- Senior developer behavior is defined in `instructions/platform/roles/dev-role.md`.
+- The workflows upload `ba-output.json` or `tech-output.json` as artifacts; you can extend them to post results back to Jira or open a PR.
 - The Jira automation directly triggers the GitHub Actions workflow using workflow dispatch API.
 - The `ticket_summary` and `ticket_description` inputs are optional; if not provided, the runner will fetch from Jira API.
 

@@ -1,4 +1,4 @@
-name: Jira -> BA Assistant
+name: Jira -> Tech Assistant
 
 on:
   workflow_dispatch:
@@ -20,8 +20,13 @@ permissions:
   contents: read
 
 jobs:
-  run-ba-assistant:
+  run-tech-assistant:
     runs-on: ubuntu-latest
+    env:
+      TARGET_REPO: ${{ vars.TARGET_REPO }}
+      TARGET_REF: ${{ vars.TARGET_REF || 'main' }}
+      TARGET_REPO_PATH: ${{ vars.TARGET_REPO_PATH || 'target-repo' }}
+      TARGET_REPO_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
 
     steps:
       - name: Checkout
@@ -37,6 +42,22 @@ jobs:
       - name: Build
         run: mvn -q -DskipTests package
 
+      - name: Clone target repository
+        run: |
+          if [ -z "$TARGET_REPO" ]; then
+            echo "[ERROR] TARGET_REPO is required (format: owner/repo)"
+            exit 1
+          fi
+
+          if [ -n "$TARGET_REPO_TOKEN" ]; then
+            CLONE_URL="https://x-access-token:${TARGET_REPO_TOKEN}@github.com/${TARGET_REPO}.git"
+          else
+            CLONE_URL="https://github.com/${TARGET_REPO}.git"
+          fi
+
+          echo "[INFO] Cloning $TARGET_REPO@$TARGET_REF into $TARGET_REPO_PATH"
+          git clone --depth 1 --branch "$TARGET_REF" "$CLONE_URL" "$TARGET_REPO_PATH"
+
       - name: Install GitHub Copilot CLI
         if: ${{ vars.USE_MODELS_API == 'false' }}
         run: |
@@ -50,6 +71,7 @@ jobs:
           echo "Copilot CLI installed successfully"
 
       - name: Generate prompt
+        working-directory: ${{ env.TARGET_REPO_PATH }}
         env:
           JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
           JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
@@ -58,21 +80,24 @@ jobs:
           USE_MODELS_API: ${{ vars.USE_MODELS_API || 'true' }}
 
           BA_INSTRUCTIONS_PATH: instructions/platform/roles/ba-role.md
+          DEV_INSTRUCTIONS_PATH: instructions/platform/roles/dev-role.md
           TECHNICAL_REQUIREMENTS_PATH: instructions/platform/technical/technical-requirements.md
 
           JIRA_ISSUE_KEY: ${{ inputs.ticket_id }}
           JIRA_ISSUE_SUMMARY: ${{ inputs.ticket_summary }}
           JIRA_ISSUE_DESCRIPTION: ${{ inputs.ticket_description }}
 
-          # Always generate prompt first
           OUTPUT_PROMPT_ONLY: true
-          PROMPT_OUTPUT_PATH: ba-prompt.txt
+          # Tech assistant prompt output file (optional override)
+          TECH_PROMPT_OUTPUT_PATH: tech-prompt.txt
+          TARGET_REPO_PATH: ${{ env.TARGET_REPO_PATH }}
         run: |
-          echo "Generating BA assistant prompt..."
-          java -jar target/ai-assistant-2-automation-0.1.0-all.jar
+          echo "Generating Tech assistant prompt..."
+          java -cp "$GITHUB_WORKSPACE/target/ai-assistant-2-automation-0.1.0-all.jar" com.ayerma.assistant.TechAssistantRunner
 
       - name: Call GitHub Models API
         if: ${{ vars.USE_MODELS_API == 'true' || vars.USE_MODELS_API == '' }}
+        working-directory: ${{ env.TARGET_REPO_PATH }}
         env:
           MODELS_TOKEN: ${{ secrets.MODELS_TOKEN }}
           MODELS_ENDPOINT: ${{ vars.MODELS_ENDPOINT }}
@@ -80,32 +105,41 @@ jobs:
 
           USE_MODELS_API: true
           OUTPUT_PROMPT_ONLY: false
-          PROMPT_OUTPUT_PATH: ba-prompt.txt
-          BA_OUTPUT_PATH: ba-output.json
+          # Tech assistant prompt output file (optional override)
+          TECH_PROMPT_OUTPUT_PATH: tech-prompt.txt
+          # Tech assistant JSON output file (optional override)
+          TECH_OUTPUT_PATH: tech-output.json
+
+          TARGET_REPO_PATH: ${{ env.TARGET_REPO_PATH }}
+
+          BA_INSTRUCTIONS_PATH: instructions/platform/roles/ba-role.md
+          DEV_INSTRUCTIONS_PATH: instructions/platform/roles/dev-role.md
+          TECHNICAL_REQUIREMENTS_PATH: instructions/platform/technical/technical-requirements.md
 
           JIRA_ISSUE_KEY: ${{ inputs.ticket_id }}
           JIRA_ISSUE_SUMMARY: ${{ inputs.ticket_summary }}
           JIRA_ISSUE_DESCRIPTION: ${{ inputs.ticket_description }}
         run: |
           echo "Calling GitHub Models API..."
-          java -jar target/ai-assistant-2-automation-0.1.0-all.jar
+          java -cp "$GITHUB_WORKSPACE/target/ai-assistant-2-automation-0.1.0-all.jar" com.ayerma.assistant.TechAssistantRunner
 
       - name: Call Copilot CLI
         if: ${{ vars.USE_MODELS_API == 'false' }}
+        working-directory: ${{ env.TARGET_REPO_PATH }}
         env:
           GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
           GH_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
         run: |
           echo "Calling Copilot CLI..."
-          copilot --allow-all-tools -p "$(cat ba-prompt.txt)" > ba-output-raw.txt
+          copilot --allow-all-tools -p "$(cat tech-prompt.txt)" > tech-output-raw.txt
 
           echo "Extracting JSON from output..."
           python3 -c "
           import re
           import json
 
-          with open('ba-output-raw.txt', 'r') as f:
+          with open('tech-output-raw.txt', 'r') as f:
               content = f.read()
 
           # Try to find JSON block
@@ -113,7 +147,7 @@ jobs:
           if json_match:
               json_str = json_match.group(0)
               parsed = json.loads(json_str)
-              with open('ba-output.json', 'w') as out:
+              with open('tech-output.json', 'w') as out:
                   json.dump(parsed, out, indent=2)
               print('[SUCCESS] Extracted and wrote JSON output')
           else:
@@ -124,5 +158,5 @@ jobs:
       - name: Upload result
         uses: actions/upload-artifact@v4
         with:
-          name: ba-output
-          path: ba-output.json
+          name: tech-output
+          path: tech-output.json

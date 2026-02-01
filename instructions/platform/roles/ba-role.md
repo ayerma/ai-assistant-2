@@ -55,6 +55,9 @@ You must return ONLY a JSON object with this structure:
 - Keep the UI modular.
 - Every task (ticket) MUST include a story point estimate based on complexity (e.g., Fibonacci: 1, 2, 3, 5, 8, 13).
 - Every task MUST be well-described: include context, scope boundaries, and what is explicitly out of scope.
+- Where possible, include explicit specifications in each task description.
+- Preserve expected input/output formats in task descriptions when they are provided in the ticket.
+- If related issues are mentioned or can be inferred, reference them and note any required alignment with similar tickets.
 - Every task MUST include clear, testable acceptance criteria describing exactly what must be implemented.
 - Dependencies between tasks MUST be defined (use `dependencies` to reference prerequisite task IDs).
 
