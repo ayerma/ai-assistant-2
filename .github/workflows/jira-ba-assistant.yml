@@ -85,7 +85,7 @@ jobs:
 
           JIRA_STORY_ISSUE_TYPE: ${{ vars.JIRA_STORY_ISSUE_TYPE || 'Story' }}
           JIRA_TASK_ISSUE_TYPE: ${{ vars.JIRA_TASK_ISSUE_TYPE || 'Task' }}
-          JIRA_QUESTION_ISSUE_TYPE: ${{ vars.JIRA_QUESTION_ISSUE_TYPE || 'Sub-task' }}
+          JIRA_QUESTION_ISSUE_TYPE: ${{ vars.JIRA_QUESTION_ISSUE_TYPE || 'Subtask' }}
           JIRA_LINK_TYPE: ${{ vars.JIRA_LINK_TYPE || 'Relates' }}
 
           JIRA_ISSUE_KEY: ${{ inputs.ticket_id }}
@@ -135,7 +135,7 @@ jobs:
 
           JIRA_STORY_ISSUE_TYPE: ${{ vars.JIRA_STORY_ISSUE_TYPE || 'Story' }}
           JIRA_TASK_ISSUE_TYPE: ${{ vars.JIRA_TASK_ISSUE_TYPE || 'Task' }}
-          JIRA_QUESTION_ISSUE_TYPE: ${{ vars.JIRA_QUESTION_ISSUE_TYPE || 'Sub-task' }}
+          JIRA_QUESTION_ISSUE_TYPE: ${{ vars.JIRA_QUESTION_ISSUE_TYPE || 'Subtask' }}
           JIRA_LINK_TYPE: ${{ vars.JIRA_LINK_TYPE || 'Relates' }}
 
           JIRA_ISSUE_KEY: ${{ inputs.ticket_id }}
