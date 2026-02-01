@@ -45,26 +45,28 @@ public final class TechAssistantRunner {
         String systemPrompt = loadSystemPrompt(baInstructionsPath, devInstructionsPath, technicalReqPath);
 
         HttpJson jiraHttp = new HttpJson();
+        JiraClient jira = new JiraClient(jiraHttp, jiraBaseUrl, jiraEmail, jiraApiToken);
 
         String providedSummary = Env.optional("JIRA_ISSUE_SUMMARY", null);
         String providedDescription = Env.optional("JIRA_ISSUE_DESCRIPTION", null);
 
         String userPrompt;
         if (providedSummary != null && !providedSummary.isBlank()) {
-            System.out.println("[INFO] Using provided summary and description (skipping Jira API call)");
-            userPrompt = BaPromptBuilder.buildUserPrompt(issueKey, providedSummary, providedDescription);
+            System.out.println("[INFO] Using provided summary and description");
+            userPrompt = buildContextualPrompt(jira, issueKey, providedSummary, providedDescription);
         } else {
             System.out.println("[INFO] Fetching issue details from Jira API...");
-            JiraClient jira = new JiraClient(jiraHttp, jiraBaseUrl, jiraEmail, jiraApiToken);
             JsonNode issue = jira.getIssue(issueKey);
             System.out.println("[INFO] Successfully fetched issue from Jira");
-            userPrompt = BaPromptBuilder.buildUserPromptFromJiraIssue(issue);
+            String summary = textAt(issue, "/fields/summary");
+            String description = textAt(issue, "/fields/description");
+            userPrompt = buildContextualPrompt(jira, issueKey, summary, description);
         }
 
         String promptOutputPath = Env.optional("TECH_PROMPT_OUTPUT_PATH", "tech-prompt.txt");
         String targetRepoPath = Env.optional("TARGET_REPO_PATH", null);
         if (targetRepoPath != null && !targetRepoPath.isBlank()) {
-            userPrompt = userPrompt + "\nRepository path: " + targetRepoPath + "\n";
+            userPrompt = userPrompt + "\n\nRepository path: " + targetRepoPath + "\n";
         }
 
         String combinedPrompt = systemPrompt + "\n\n" + userPrompt;
@@ -137,5 +139,149 @@ public final class TechAssistantRunner {
         systemPrompt.append("\n\nIMPORTANT: Follow the instructions exactly. Return ONLY the strict JSON object.");
         System.out.println("[INFO] System prompt loaded (total length: " + systemPrompt.length() + " chars)");
         return systemPrompt.toString();
+    }
+
+    private static String buildContextualPrompt(JiraClient jira, String issueKey, String summary, String description)
+            throws Exception {
+        System.out.println("[INFO] Building contextual prompt for: " + issueKey);
+
+        StringBuilder prompt = new StringBuilder();
+
+        // Fetch current issue for parent traversal
+        JsonNode currentIssue = jira.getIssue(issueKey);
+
+        // Traverse up to find Epic or root ticket for context
+        JsonNode parentIssue = findParentEpic(jira, currentIssue);
+        if (parentIssue != null) {
+            String parentKey = textAt(parentIssue, "/key");
+            String parentType = textAt(parentIssue, "/fields/issuetype/name");
+            String parentSummary = textAt(parentIssue, "/fields/summary");
+            String parentDescription = textAt(parentIssue, "/fields/description");
+
+            System.out.println("[INFO] Found parent context: " + parentKey + " (type: " + parentType + ")");
+            prompt.append("# Context: Original Application Idea\n\n");
+            prompt.append(parentType).append(": ").append(parentKey).append("\n");
+            prompt.append("Summary: ").append(parentSummary).append("\n\n");
+            if (parentDescription != null && !parentDescription.isBlank()) {
+                prompt.append(parentDescription).append("\n\n");
+            }
+            prompt.append("---\n\n");
+        }
+
+        // Current task
+        prompt.append("# Current Task\n\n");
+        prompt.append("Issue: ").append(issueKey).append("\n");
+        prompt.append("Summary: ").append(summary).append("\n\n");
+        if (description != null && !description.isBlank()) {
+            prompt.append("Description:\n").append(description).append("\n\n");
+        }
+
+        // Fetch question subtasks with answers
+        JsonNode subtasks = currentIssue.at("/fields/subtasks");
+        if (subtasks.isArray() && subtasks.size() > 0) {
+            StringBuilder questionsBlock = new StringBuilder();
+            int questionCount = 0;
+
+            for (JsonNode subtask : subtasks) {
+                String subtaskKey = textAt(subtask, "/key");
+                JsonNode subtaskDetails = jira.getIssue(subtaskKey);
+                String subtaskSummary = textAt(subtaskDetails, "/fields/summary");
+
+                // Only include questions (starting with [Question])
+                if (subtaskSummary != null && subtaskSummary.startsWith("[Question]")) {
+                    String subtaskDescription = textAt(subtaskDetails, "/fields/description");
+                    String resolution = textAt(subtaskDetails, "/fields/resolution/name");
+
+                    questionCount++;
+                    questionsBlock.append("## Question ").append(questionCount).append("\n");
+                    questionsBlock.append("**Q:** ").append(subtaskSummary.replace("[Question]", "").trim())
+                            .append("\n\n");
+
+                    if (subtaskDescription != null && !subtaskDescription.isBlank()) {
+                        questionsBlock.append("**Context:** ").append(subtaskDescription).append("\n\n");
+                    }
+
+                    // Try to get answer from comments or resolution
+                    JsonNode comments = subtaskDetails.at("/fields/comment/comments");
+                    if (comments.isArray() && comments.size() > 0) {
+                        // Get the latest comment as answer
+                        JsonNode lastComment = comments.get(comments.size() - 1);
+                        String answer = textAt(lastComment, "/body");
+                        if (answer != null && !answer.isBlank()) {
+                            questionsBlock.append("**A:** ").append(answer).append("\n\n");
+                        }
+                    } else if (resolution != null && !resolution.equals("Unresolved")) {
+                        questionsBlock.append("**Status:** ").append(resolution).append("\n\n");
+                    }
+
+                    questionsBlock.append("---\n\n");
+                }
+            }
+
+            if (questionCount > 0) {
+                System.out.println("[INFO] Found " + questionCount + " question subtasks");
+                prompt.append("# Additional Details (Questions & Answers)\n\n");
+                prompt.append(questionsBlock);
+            }
+        }
+
+        // Important scope instructions
+        prompt.append("# Important Instructions\n\n");
+        prompt.append("- You MUST work ONLY on the current task defined above (").append(issueKey).append(")\n");
+        prompt.append("- Parent tickets are provided for context only\n");
+        prompt.append("- Follow all technical requirements from the technical guide\n");
+        prompt.append("- Implement only what is specified in the task description and answered questions\n");
+        prompt.append("- Do not add features or functionality beyond the current task scope\n");
+
+        return prompt.toString();
+    }
+
+    private static JsonNode findParentEpic(JiraClient jira, JsonNode issue) throws Exception {
+        System.out.println("[INFO] Traversing parent hierarchy to find Epic or root ticket");
+
+        JsonNode current = issue;
+        int depth = 0;
+        int maxDepth = 10; // Prevent infinite loops
+
+        while (depth < maxDepth) {
+            String issueType = textAt(current, "/fields/issuetype/name");
+            String issueKey = textAt(current, "/key");
+
+            System.out.println("[DEBUG] Checking issue " + issueKey + " (type: " + issueType + ")");
+
+            // STOP CONDITION 1: Found Epic
+            if ("Epic".equalsIgnoreCase(issueType)) {
+                System.out.println("[INFO] Found Epic: " + issueKey);
+                return current;
+            }
+
+            // Try to get parent issue
+            JsonNode parent = current.at("/fields/parent");
+            if (!parent.isMissingNode() && !parent.isNull()) {
+                String parentKey = textAt(parent, "/key");
+                System.out.println("[DEBUG] Following parent link to: " + parentKey);
+                current = jira.getIssue(parentKey);
+                depth++;
+                continue;
+            }
+
+            // STOP CONDITION 2: No more parent tickets (reached root)
+            System.out.println("[INFO] No parent ticket found - using " + issueKey + " as root context");
+            return current;
+        }
+
+        System.out.println("[WARN] Max depth reached while traversing parents");
+        return current; // Return current as fallback
+    }
+
+    private static String textAt(JsonNode node, String pointer) {
+        if (node == null) {
+            return null;
+        }
+        JsonNode value = node.at(pointer);
+        if (value.isMissingNode() || value.isNull()) {
+            return null;
+        }
+        return value.asText(null);
     }
 }
