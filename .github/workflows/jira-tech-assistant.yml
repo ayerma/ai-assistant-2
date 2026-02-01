@@ -18,6 +18,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   run-tech-assistant:
@@ -57,6 +58,16 @@ jobs:
 
           echo "[INFO] Cloning $TARGET_REPO@$TARGET_REF into $TARGET_REPO_PATH"
           git clone --depth 1 --branch "$TARGET_REF" "$CLONE_URL" "$TARGET_REPO_PATH"
+
+          # Configure git with token for PR creation
+          cd "$TARGET_REPO_PATH"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          if [ -n "$TARGET_REPO_TOKEN" ]; then
+            git config credential.helper store
+            echo "https://x-access-token:${TARGET_REPO_TOKEN}@github.com" > ~/.git-credentials
+          fi
 
       - name: Install GitHub Copilot CLI
         if: ${{ vars.USE_MODELS_API == 'false' }}
