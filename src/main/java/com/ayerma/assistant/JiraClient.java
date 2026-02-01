@@ -51,6 +51,11 @@ public final class JiraClient {
             fields.set("description", toAdf(description));
         }
 
+        // Add DEV-AI label
+        ArrayNode labels = HttpJson.MAPPER.createArrayNode();
+        labels.add("DEV-AI");
+        fields.set("labels", labels);
+
         ObjectNode payload = HttpJson.MAPPER.createObjectNode();
         payload.set("fields", fields);
 
