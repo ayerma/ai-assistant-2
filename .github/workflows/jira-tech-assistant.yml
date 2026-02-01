@@ -27,7 +27,7 @@ jobs:
       TARGET_REPO: ${{ vars.TARGET_REPO }}
       TARGET_REF: ${{ vars.TARGET_REF || 'main' }}
       TARGET_REPO_PATH: ${{ vars.TARGET_REPO_PATH || 'target-repo' }}
-      TARGET_REPO_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
+      TARGET_REPO_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
 
     steps:
       - name: Checkout
@@ -151,7 +151,7 @@ jobs:
           # Authenticate gh CLI with Copilot token for PR creation
           echo "${{ secrets.COPILOT_GITHUB_TOKEN }}" | gh auth login --with-token
           gh auth status
-          
+
           echo "Calling Copilot CLI..."
           copilot --allow-all-tools -p "$(cat tech-prompt.txt)" > tech-output-raw.txt
 
