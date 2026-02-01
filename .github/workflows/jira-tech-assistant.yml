@@ -59,14 +59,21 @@ jobs:
           echo "[INFO] Cloning $TARGET_REPO@$TARGET_REF into $TARGET_REPO_PATH"
           git clone --depth 1 --branch "$TARGET_REF" "$CLONE_URL" "$TARGET_REPO_PATH"
 
-          # Configure git with token for PR creation
+          # Configure git with token for all operations
           cd "$TARGET_REPO_PATH"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           if [ -n "$TARGET_REPO_TOKEN" ]; then
-            git config credential.helper store
+            # Update remote URL to use token for push operations
+            git remote set-url origin "https://x-access-token:${TARGET_REPO_TOKEN}@github.com/${TARGET_REPO}.git"
+            
+            # Configure git to use the token globally for this runner
+            git config --global credential.helper store
             echo "https://x-access-token:${TARGET_REPO_TOKEN}@github.com" > ~/.git-credentials
+            
+            # Also set url insteadOf for https GitHub URLs
+            git config --global url."https://x-access-token:${TARGET_REPO_TOKEN}@github.com/".insteadOf "https://github.com/"
           fi
 
       - name: Install GitHub Copilot CLI
@@ -138,9 +145,13 @@ jobs:
         if: ${{ vars.USE_MODELS_API == 'false' }}
         working-directory: ${{ env.TARGET_REPO_PATH }}
         env:
-          GITHUB_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
-          GH_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
         run: |
+          # Authenticate gh CLI with Copilot token for PR creation
+          echo "${{ secrets.COPILOT_GITHUB_TOKEN }}" | gh auth login --with-token
+          gh auth status
+          
           echo "Calling Copilot CLI..."
           copilot --allow-all-tools -p "$(cat tech-prompt.txt)" > tech-output-raw.txt
 
