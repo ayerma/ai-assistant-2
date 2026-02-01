@@ -39,6 +39,9 @@ public final class JiraClient {
             throws IOException, InterruptedException {
         URI uri = URI.create(baseUrl + "/rest/api/3/issue");
 
+        System.out.println("[DEBUG] Jira createIssue => project=" + projectKey + ", type=" + issueTypeName
+            + ", summary=" + summary);
+
         ObjectNode fields = HttpJson.MAPPER.createObjectNode();
         fields.putObject("project").put("key", projectKey);
         fields.putObject("issuetype").put("name", issueTypeName);
@@ -69,6 +72,9 @@ public final class JiraClient {
     public String createSubtask(String projectKey, String issueTypeName, String parentKey, String summary,
             String description) throws IOException, InterruptedException {
         URI uri = URI.create(baseUrl + "/rest/api/3/issue");
+
+        System.out.println("[DEBUG] Jira createSubtask => project=" + projectKey + ", type=" + issueTypeName
+            + ", parent=" + parentKey + ", summary=" + summary);
 
         ObjectNode fields = HttpJson.MAPPER.createObjectNode();
         fields.putObject("project").put("key", projectKey);
@@ -101,6 +107,8 @@ public final class JiraClient {
     public void linkIssues(String inwardKey, String outwardKey, String linkType)
             throws IOException, InterruptedException {
         URI uri = URI.create(baseUrl + "/rest/api/3/issueLink");
+
+        System.out.println("[DEBUG] Jira linkIssues => " + inwardKey + " -> " + outwardKey + " (" + linkType + ")");
 
         ObjectNode payload = HttpJson.MAPPER.createObjectNode();
         payload.putObject("type").put("name", linkType);

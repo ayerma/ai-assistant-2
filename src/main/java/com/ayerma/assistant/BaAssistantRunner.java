@@ -123,11 +123,15 @@ public final class BaAssistantRunner {
         String taskIssueType = Env.optional("JIRA_TASK_ISSUE_TYPE", "Task");
         String questionIssueType = Env.optional("JIRA_QUESTION_ISSUE_TYPE", "Sub-task");
         String linkType = Env.optional("JIRA_LINK_TYPE", "Relates");
+        System.out.println("[DEBUG] Issue types => story: " + storyIssueType + ", task: " + taskIssueType
+            + ", question: " + questionIssueType + ", link: " + linkType);
         JsonNode tasks = parsed.get("tasks");
         if (tasks == null || !tasks.isArray() || tasks.isEmpty()) {
             System.out.println("[WARN] No tasks found in BA output - skipping Jira creation");
             return;
         }
+
+        System.out.println("[INFO] Tasks found: " + tasks.size());
 
         int createdCount = 0;
         java.util.Map<String, String> taskKeyById = new java.util.HashMap<>();
@@ -139,7 +143,11 @@ public final class BaAssistantRunner {
 
             String ticketType = textAt(task, "/ticket_type");
             String issueTypeName = resolveIssueType(ticketType, storyIssueType, taskIssueType);
+            System.out.println("[DEBUG] Creating issue for task " + (id != null ? id : "(no-id)")
+                + " with type=" + issueTypeName + ", summary=" + summary);
             String createdKey = jiraClient.createIssue(projectKey, issueTypeName, summary, description);
+            System.out.println("[DEBUG] Linking issue " + createdKey + " to parent " + issueKey
+                + " with link type " + linkType);
             jiraClient.linkIssues(issueKey, createdKey, linkType);
             createdCount++;
             System.out.println("[SUCCESS] Created Jira issue: " + createdKey + " (" + summary + ")");
@@ -150,6 +158,7 @@ public final class BaAssistantRunner {
 
             JsonNode subTickets = task.get("sub_tickets");
             if (subTickets != null && subTickets.isArray() && !subTickets.isEmpty()) {
+                System.out.println("[INFO] Question sub-tickets found for " + createdKey + ": " + subTickets.size());
                 for (JsonNode subTicket : subTickets) {
                     String subTitle = textAt(subTicket, "/title");
                     String subId = textAt(subTicket, "/id");
@@ -158,6 +167,8 @@ public final class BaAssistantRunner {
                             : "Question " + (subId != null ? subId : "(unnamed)");
                     String subDescription = buildQuestionDescription(subTicket);
 
+                    System.out.println("[DEBUG] Creating question subtask for parent " + createdKey
+                            + " with type=" + questionIssueType + ", summary=" + subSummary);
                     String questionKey = jiraClient.createSubtask(projectKey, questionIssueType, createdKey,
                             subSummary, subDescription);
                     System.out.println("[SUCCESS] Created question subtask: " + questionKey + " (" + subSummary + ")");
