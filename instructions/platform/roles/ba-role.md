@@ -25,7 +25,7 @@ You must return ONLY a JSON object with this structure:
 "tasks": [
 {
 "id": "T-001",
-"ticket_type": "task",
+"ticket_type": "story | task",
 "story_points": 1,
 "type": "component | logic | styling | data",
 "title": "Task title",
@@ -65,11 +65,10 @@ You must return ONLY a JSON object with this structure:
 
 Treat the triggering Jira ticket as the **epic**. Do NOT output epics in the JSON.
 
-All tickets MUST use ticket_type: "task". Use story_points to indicate complexity:
+You MUST decide the appropriate ticket type for each task based on complexity and scope:
 
-- **1-3 story points**: Small, focused implementation work
-- **5-8 story points**: Medium-sized features that deliver user value
-- **13+ story points**: Large features that should be broken down into smaller tasks
+- **story**: Use for medium-sized features that deliver user value but can be completed in a single sprint. Typically 3-8 story points.
+- **task**: Use for small, focused implementation work or technical tasks. Typically 1-3 story points.
 
 ## Decision-Making Guidelines
 
@@ -116,7 +115,7 @@ When creating question sub-tickets:
 ```json
 {
   "id": "T-001",
-  "ticket_type": "task",
+  "ticket_type": "story",
   "story_points": 5,
   "type": "logic",
   "title": "Implement user authentication system",
