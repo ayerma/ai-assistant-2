@@ -184,18 +184,18 @@ jobs:
         with:
           name: tech-output
           path: |
-            tech-output.json
-            tech-output-raw.txt
+            ${{ env.TARGET_REPO_PATH }}/tech-output.json
+            ${{ env.TARGET_REPO_PATH }}/tech-output-raw.txt
 
       - name: Attach PR URL to Jira
         if: ${{ vars.USE_MODELS_API == 'false' }}
         working-directory: ${{ env.TARGET_REPO_PATH }}
         env:
           ATTACH_PR_TO_JIRA: true
-          JIRA_ISSUE_KEY: ${{ github.event.inputs.jira_issue_key }}
+          JIRA_ISSUE_KEY: ${{ inputs.ticket_id }}
           JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
           JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
           TECH_OUTPUT_PATH: tech-output.json
         run: |
-          java -jar ${{ github.workspace }}/target/ba-assistant-uber.jar
+          java -cp "$GITHUB_WORKSPACE/target/ai-assistant-2-automation-0.1.0-all.jar" com.ayerma.assistant.TechAssistantRunner

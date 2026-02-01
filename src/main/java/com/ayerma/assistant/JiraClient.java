@@ -184,6 +184,7 @@ public final class JiraClient {
         }
         return value;
     }
+
     public void addComment(String issueKey, String comment) throws IOException, InterruptedException {
         String encoded = URLEncoder.encode(issueKey, StandardCharsets.UTF_8);
         URI uri = URI.create(baseUrl + "/rest/api/3/issue/" + encoded + "/comment");
@@ -204,6 +205,7 @@ public final class JiraClient {
         JsonNode response = http.postJson(request);
         System.out.println("[SUCCESS] Added comment to " + issueKey);
     }
+
     private static ObjectNode toAdf(String text) {
         ObjectNode doc = HttpJson.MAPPER.createObjectNode();
         doc.put("type", "doc");
