@@ -138,9 +138,8 @@ jobs:
         if: ${{ vars.USE_MODELS_API == 'false' }}
         working-directory: ${{ env.TARGET_REPO_PATH }}
         env:
-          GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
-          GH_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
-          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
+          GH_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
         run: |
           echo "Calling Copilot CLI..."
           copilot --allow-all-tools -p "$(cat tech-prompt.txt)" > tech-output-raw.txt
