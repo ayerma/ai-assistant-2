@@ -76,17 +76,18 @@ The BA assistant now includes enhanced decision-making capabilities:
 
 ### Ticket Type Classification
 
-The BA assistant outputs only stories and tasks (the triggering ticket is treated as the epic):
+The BA assistant outputs only tasks (the triggering ticket is treated as the epic):
 
-- **Story**: Medium features (3-8 story points) delivering user value
-- **Task**: Small, focused work (1-3 story points)
+- **Task**: All implementation work, differentiated by story points (1-3 for small tasks, 5-8 for medium features, 13+ for large features that should be broken down)
+- **Question**: Sub-tasks for critical decisions requiring human input
 
 ### Output Schema
 
 The JSON output includes:
 
-- `ticket_type`: story or task
-- `sub_tickets`: Array of question tickets when critical decisions are needed (created as subtasks)
+- `ticket_type`: task (all tickets) or question (for sub-tickets)
+- `story_points`: 1-3 (small), 5-8 (medium), 13+ (large/should be broken down)
+- `sub_tickets`: Array of question tickets when critical decisions are needed (created as Jira subtasks)
 - Each question ticket includes context, options, and reasoning for why human input is required
 
 See `instructions/platform/roles/ba-role.md` for detailed examples and guidelines.

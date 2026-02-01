@@ -83,7 +83,7 @@ jobs:
           PROMPT_OUTPUT_PATH: ba-prompt.txt
           BA_OUTPUT_PATH: ba-output.json
 
-          JIRA_STORY_ISSUE_TYPE: ${{ vars.JIRA_STORY_ISSUE_TYPE || 'Story' }}
+          JIRA_STORY_ISSUE_TYPE: ${{ vars.JIRA_STORY_ISSUE_TYPE || 'Task' }}
           JIRA_TASK_ISSUE_TYPE: ${{ vars.JIRA_TASK_ISSUE_TYPE || 'Task' }}
           JIRA_QUESTION_ISSUE_TYPE: ${{ vars.JIRA_QUESTION_ISSUE_TYPE || 'Sub-task' }}
           JIRA_LINK_TYPE: ${{ vars.JIRA_LINK_TYPE || 'Relates' }}
@@ -133,7 +133,7 @@ jobs:
           JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
 
-          JIRA_STORY_ISSUE_TYPE: ${{ vars.JIRA_STORY_ISSUE_TYPE || 'Story' }}
+          JIRA_STORY_ISSUE_TYPE: ${{ vars.JIRA_STORY_ISSUE_TYPE || 'Task' }}
           JIRA_TASK_ISSUE_TYPE: ${{ vars.JIRA_TASK_ISSUE_TYPE || 'Task' }}
           JIRA_QUESTION_ISSUE_TYPE: ${{ vars.JIRA_QUESTION_ISSUE_TYPE || 'Sub-task' }}
           JIRA_LINK_TYPE: ${{ vars.JIRA_LINK_TYPE || 'Relates' }}

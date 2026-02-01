@@ -25,7 +25,7 @@ You must return ONLY a JSON object with this structure:
 "tasks": [
 {
 "id": "T-001",
-"ticket_type": "story | task",
+"ticket_type": "task",
 "story_points": 1,
 "type": "component | logic | styling | data",
 "title": "Task title",
@@ -65,10 +65,11 @@ You must return ONLY a JSON object with this structure:
 
 Treat the triggering Jira ticket as the **epic**. Do NOT output epics in the JSON.
 
-You MUST decide the appropriate ticket type for each task based on complexity and scope:
+All tickets MUST use ticket_type: "task". Use story_points to indicate complexity:
 
-- **story**: Use for medium-sized features that deliver user value but can be completed in a single sprint. Typically 3-8 story points.
-- **task**: Use for small, focused implementation work or technical tasks. Typically 1-3 story points.
+- **1-3 story points**: Small, focused implementation work
+- **5-8 story points**: Medium-sized features that deliver user value
+- **13+ story points**: Large features that should be broken down into smaller tasks
 
 ## Decision-Making Guidelines
 
@@ -115,7 +116,7 @@ When creating question sub-tickets:
 ```json
 {
   "id": "T-001",
-  "ticket_type": "story",
+  "ticket_type": "task",
   "story_points": 5,
   "type": "logic",
   "title": "Implement user authentication system",
@@ -131,7 +132,7 @@ When creating question sub-tickets:
   "sub_tickets": [
     {
       "id": "T-001-Q1",
-      "ticket_type": "task",
+      "ticket_type": "question",
       "title": "[Question] Should we integrate with third-party OAuth providers?",
       "description": "Context: We are implementing user authentication. We can implement email/password auth as planned, but we should decide whether to also support OAuth providers (Google, GitHub, Microsoft).\n\nOptions:\n1. Email/password only (simpler, faster to implement)\n2. Add OAuth providers (better UX, more secure, industry standard)\n\nConsiderations:\n- OAuth reduces password management burden on users\n- OAuth providers offer 2FA by default\n- Integration adds complexity but is valuable for user adoption\n- Most modern apps support social login\n\nQuestion: Should we include OAuth provider integration in the initial release or defer to a future iteration?",
       "reason": "Business-critical: This decision impacts user acquisition, onboarding experience, and competitive positioning. OAuth support is often expected by users but adds scope."
