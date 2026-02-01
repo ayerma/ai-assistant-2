@@ -162,7 +162,8 @@ public final class BaAssistantRunner {
             String issueTypeName = resolveIssueType(ticketType, storyIssueType, taskIssueType);
             System.out.println("[DEBUG] Creating issue for task " + (id != null ? id : "(no-id)")
                     + " with type=" + issueTypeName + ", parent=" + issueKey + ", summary=" + summary);
-            String createdKey = jiraClient.createIssueWithParent(projectKey, issueTypeName, issueKey, summary, description);
+            String createdKey = jiraClient.createIssueWithParent(projectKey, issueTypeName, issueKey, summary,
+                    description);
             createdCount++;
             System.out.println("[SUCCESS] Created Jira issue: " + createdKey + " (" + summary + ")");
 

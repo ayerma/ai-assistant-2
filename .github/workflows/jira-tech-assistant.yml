@@ -79,9 +79,9 @@ jobs:
 
           USE_MODELS_API: ${{ vars.USE_MODELS_API || 'true' }}
 
-          BA_INSTRUCTIONS_PATH: instructions/platform/roles/ba-role.md
-          DEV_INSTRUCTIONS_PATH: instructions/platform/roles/dev-role.md
-          TECHNICAL_REQUIREMENTS_PATH: instructions/platform/technical/technical-requirements.md
+          # Use absolute paths from ai-assistant-2 repo
+          DEV_INSTRUCTIONS_PATH: ${{ github.workspace }}/instructions/platform/roles/dev-role.md
+          TECHNICAL_REQUIREMENTS_PATH: ${{ github.workspace }}/instructions/platform/technical/technical-requirements.md
 
           JIRA_ISSUE_KEY: ${{ inputs.ticket_id }}
           JIRA_ISSUE_SUMMARY: ${{ inputs.ticket_summary }}
@@ -112,9 +112,9 @@ jobs:
 
           TARGET_REPO_PATH: ${{ env.TARGET_REPO_PATH }}
 
-          BA_INSTRUCTIONS_PATH: instructions/platform/roles/ba-role.md
-          DEV_INSTRUCTIONS_PATH: instructions/platform/roles/dev-role.md
-          TECHNICAL_REQUIREMENTS_PATH: instructions/platform/technical/technical-requirements.md
+          # Use absolute paths from ai-assistant-2 repo
+          DEV_INSTRUCTIONS_PATH: ${{ github.workspace }}/instructions/platform/roles/dev-role.md
+          TECHNICAL_REQUIREMENTS_PATH: ${{ github.workspace }}/instructions/platform/technical/technical-requirements.md
 
           JIRA_ISSUE_KEY: ${{ inputs.ticket_id }}
           JIRA_ISSUE_SUMMARY: ${{ inputs.ticket_summary }}

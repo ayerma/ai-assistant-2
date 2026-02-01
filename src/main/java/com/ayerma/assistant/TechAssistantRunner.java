@@ -35,14 +35,13 @@ public final class TechAssistantRunner {
             System.out.println("[INFO] Using CLI command: " + cliCommand);
         }
 
-        String baInstructionsPath = Env.optional("BA_INSTRUCTIONS_PATH", "instructions/platform/roles/ba-role.md");
         String devInstructionsPath = Env.optional("DEV_INSTRUCTIONS_PATH", "instructions/platform/roles/dev-role.md");
         String technicalReqPath = Env.optional("TECHNICAL_REQUIREMENTS_PATH",
                 "instructions/platform/technical/technical-requirements.md");
         String outputPath = Env.optional("TECH_OUTPUT_PATH", "tech-output.json");
 
-        System.out.println("[INFO] Loading instructions from: " + baInstructionsPath);
-        String systemPrompt = loadSystemPrompt(baInstructionsPath, devInstructionsPath, technicalReqPath);
+        System.out.println("[INFO] Loading instructions from: " + devInstructionsPath);
+        String systemPrompt = loadSystemPrompt(devInstructionsPath, technicalReqPath);
 
         HttpJson jiraHttp = new HttpJson();
         JiraClient jira = new JiraClient(jiraHttp, jiraBaseUrl, jiraEmail, jiraApiToken);
@@ -106,24 +105,13 @@ public final class TechAssistantRunner {
         System.out.println("[SUCCESS] Wrote Tech output to: " + outputPath);
     }
 
-    private static String loadSystemPrompt(String baInstructionsPath, String devInstructionsPath,
-            String technicalReqPath)
+    private static String loadSystemPrompt(String devInstructionsPath, String technicalReqPath)
             throws IOException {
         StringBuilder systemPrompt = new StringBuilder();
 
-        System.out.println("[INFO] Loading BA role instructions...");
-        String baInstructions = Files.readString(Path.of(baInstructionsPath), StandardCharsets.UTF_8);
-        systemPrompt.append(baInstructions);
-
-        Path devPath = Path.of(devInstructionsPath);
-        if (Files.exists(devPath)) {
-            System.out.println("[INFO] Loading senior developer instructions from: " + devInstructionsPath);
-            systemPrompt.append("\n\n---\n\n");
-            String devInstructions = Files.readString(devPath, StandardCharsets.UTF_8);
-            systemPrompt.append(devInstructions);
-        } else {
-            System.out.println("[WARN] Senior developer instructions file not found: " + devInstructionsPath);
-        }
+        System.out.println("[INFO] Loading senior developer instructions...");
+        String devInstructions = Files.readString(Path.of(devInstructionsPath), StandardCharsets.UTF_8);
+        systemPrompt.append(devInstructions);
 
         Path techPath = Path.of(technicalReqPath);
         if (Files.exists(techPath)) {
