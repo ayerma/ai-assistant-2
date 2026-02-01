@@ -34,6 +34,10 @@ Optional **GitHub repository variables**:
 - `TARGET_REPO` (format: `owner/repo`, required for Tech Assistant)
 - `TARGET_REF` (default: `main`)
 - `TARGET_REPO_PATH` (default: `target-repo`)
+- `JIRA_STORY_ISSUE_TYPE` (default: `Story`)
+- `JIRA_TASK_ISSUE_TYPE` (default: `Task`)
+- `JIRA_QUESTION_ISSUE_TYPE` (default: `Sub-task`)
+- `JIRA_LINK_TYPE` (default: `Relates`)
 
 Optional **GitHub repository secrets** (for private target repos):
 
@@ -60,24 +64,29 @@ The Tech Assistant workflow generates a code-focused implementation plan using B
 The BA assistant now includes enhanced decision-making capabilities:
 
 ### Autonomous Decision Making
+
 - The BA assistant makes most technical decisions automatically based on best practices, project requirements, and industry standards
 - Decisions are made for component structure, UI organization, styling, naming conventions, and minor technical choices
 
 ### Question Tickets
+
 - For **business-critical** or **technically-critical** decisions, the BA assistant creates sub-tickets with questions
 - Question tickets have the `[Question]` prefix in the title and are of type `task`
 - These allow stakeholders to make important decisions while the BA assistant handles routine choices
 
 ### Ticket Type Classification
-The BA assistant automatically determines the appropriate ticket type:
-- **Epic**: Large features (13+ story points) requiring multiple stories/tasks
+
+The BA assistant outputs only stories and tasks (the triggering ticket is treated as the epic):
+
 - **Story**: Medium features (3-8 story points) delivering user value
 - **Task**: Small, focused work (1-3 story points)
 
 ### Output Schema
+
 The JSON output includes:
-- `ticket_type`: epic, story, or task
-- `sub_tickets`: Array of question tickets when critical decisions are needed
+
+- `ticket_type`: story or task
+- `sub_tickets`: Array of question tickets when critical decisions are needed (created as subtasks)
 - Each question ticket includes context, options, and reasoning for why human input is required
 
 See `instructions/platform/roles/ba-role.md` for detailed examples and guidelines.

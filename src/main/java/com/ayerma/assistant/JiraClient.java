@@ -1,6 +1,8 @@
 package com.ayerma.assistant;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.io.IOException;
 import java.net.URI;
@@ -33,6 +35,88 @@ public final class JiraClient {
         return http.getJson(request);
     }
 
+    public String createIssue(String projectKey, String issueTypeName, String summary, String description)
+            throws IOException, InterruptedException {
+        URI uri = URI.create(baseUrl + "/rest/api/3/issue");
+
+        ObjectNode fields = HttpJson.MAPPER.createObjectNode();
+        fields.putObject("project").put("key", projectKey);
+        fields.putObject("issuetype").put("name", issueTypeName);
+        fields.put("summary", summary);
+
+        if (description != null && !description.isBlank()) {
+            fields.set("description", toAdf(description));
+        }
+
+        ObjectNode payload = HttpJson.MAPPER.createObjectNode();
+        payload.set("fields", fields);
+
+        HttpRequest request = HttpJson.baseRequest(uri)
+                .header("Authorization", basicAuth(email, apiToken))
+                .header("Accept", "application/json")
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(payload.toString()))
+                .build();
+
+        JsonNode response = http.postJson(request);
+        JsonNode keyNode = response.get("key");
+        if (keyNode == null || keyNode.isNull()) {
+            throw new IOException("Jira issue creation response missing key");
+        }
+        return keyNode.asText();
+    }
+
+    public String createSubtask(String projectKey, String issueTypeName, String parentKey, String summary,
+            String description) throws IOException, InterruptedException {
+        URI uri = URI.create(baseUrl + "/rest/api/3/issue");
+
+        ObjectNode fields = HttpJson.MAPPER.createObjectNode();
+        fields.putObject("project").put("key", projectKey);
+        fields.putObject("issuetype").put("name", issueTypeName);
+        fields.putObject("parent").put("key", parentKey);
+        fields.put("summary", summary);
+
+        if (description != null && !description.isBlank()) {
+            fields.set("description", toAdf(description));
+        }
+
+        ObjectNode payload = HttpJson.MAPPER.createObjectNode();
+        payload.set("fields", fields);
+
+        HttpRequest request = HttpJson.baseRequest(uri)
+                .header("Authorization", basicAuth(email, apiToken))
+                .header("Accept", "application/json")
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(payload.toString()))
+                .build();
+
+        JsonNode response = http.postJson(request);
+        JsonNode keyNode = response.get("key");
+        if (keyNode == null || keyNode.isNull()) {
+            throw new IOException("Jira subtask creation response missing key");
+        }
+        return keyNode.asText();
+    }
+
+    public void linkIssues(String inwardKey, String outwardKey, String linkType)
+            throws IOException, InterruptedException {
+        URI uri = URI.create(baseUrl + "/rest/api/3/issueLink");
+
+        ObjectNode payload = HttpJson.MAPPER.createObjectNode();
+        payload.putObject("type").put("name", linkType);
+        payload.putObject("inwardIssue").put("key", inwardKey);
+        payload.putObject("outwardIssue").put("key", outwardKey);
+
+        HttpRequest request = HttpJson.baseRequest(uri)
+                .header("Authorization", basicAuth(email, apiToken))
+                .header("Accept", "application/json")
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(payload.toString()))
+                .build();
+
+        http.postJson(request);
+    }
+
     private static String basicAuth(String email, String token) {
         String raw = email + ":" + token;
         String encoded = Base64.getEncoder().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
@@ -46,5 +130,32 @@ public final class JiraClient {
             value = value.substring(0, value.length() - 1);
         }
         return value;
+    }
+
+    private static ObjectNode toAdf(String text) {
+        ObjectNode doc = HttpJson.MAPPER.createObjectNode();
+        doc.put("type", "doc");
+        doc.put("version", 1);
+
+        ArrayNode content = HttpJson.MAPPER.createArrayNode();
+        doc.set("content", content);
+
+        String[] lines = text.split("\\r?\\n");
+        for (String line : lines) {
+            ObjectNode paragraph = HttpJson.MAPPER.createObjectNode();
+            paragraph.put("type", "paragraph");
+
+            ArrayNode pContent = HttpJson.MAPPER.createArrayNode();
+            paragraph.set("content", pContent);
+
+            ObjectNode textNode = HttpJson.MAPPER.createObjectNode();
+            textNode.put("type", "text");
+            textNode.put("text", line);
+            pContent.add(textNode);
+
+            content.add(paragraph);
+        }
+
+        return doc;
     }
 }

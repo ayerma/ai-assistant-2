@@ -45,12 +45,14 @@ public final class BaAssistantRunner {
         String systemPrompt = loadSystemPrompt(instructionsPath, technicalReqPath);
 
         HttpJson jiraHttp = new HttpJson();
+        JiraClient jiraClient = new JiraClient(jiraHttp, jiraBaseUrl, jiraEmail, jiraApiToken);
 
         // Check if summary and description are provided to skip Jira API call
         String providedSummary = Env.optional("JIRA_ISSUE_SUMMARY", null);
         String providedDescription = Env.optional("JIRA_ISSUE_DESCRIPTION", null);
 
         String userPrompt;
+        JsonNode issue = null;
         if (providedSummary != null && !providedSummary.isBlank()) {
             // Build prompt from provided inputs (skip Jira API call)
             System.out.println("[INFO] Using provided summary and description (skipping Jira API call)");
@@ -58,8 +60,7 @@ public final class BaAssistantRunner {
         } else {
             // Fetch from Jira (existing behavior)
             System.out.println("[INFO] Fetching issue details from Jira API...");
-            JiraClient jira = new JiraClient(jiraHttp, jiraBaseUrl, jiraEmail, jiraApiToken);
-            JsonNode issue = jira.getIssue(issueKey);
+            issue = jiraClient.getIssue(issueKey);
             System.out.println("[INFO] Successfully fetched issue from Jira");
             userPrompt = BaPromptBuilder.buildUserPromptFromJiraIssue(issue);
         }
@@ -105,6 +106,66 @@ public final class BaAssistantRunner {
         Files.writeString(Path.of(outputPath),
                 HttpJson.MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(parsed), StandardCharsets.UTF_8);
         System.out.println("[SUCCESS] Wrote BA output to: " + outputPath);
+
+        System.out.println("[INFO] Creating Jira linked issues from BA output...");
+
+        if (issue == null) {
+            System.out.println("[INFO] Loading parent issue for task creation...");
+            issue = jiraClient.getIssue(issueKey);
+        }
+
+        String projectKey = textAt(issue, "/fields/project/key");
+        if (projectKey == null || projectKey.isBlank()) {
+            throw new IllegalStateException("Unable to resolve project key from Jira issue: " + issueKey);
+        }
+
+        String storyIssueType = Env.optional("JIRA_STORY_ISSUE_TYPE", "Story");
+        String taskIssueType = Env.optional("JIRA_TASK_ISSUE_TYPE", "Task");
+        String questionIssueType = Env.optional("JIRA_QUESTION_ISSUE_TYPE", "Sub-task");
+        String linkType = Env.optional("JIRA_LINK_TYPE", "Relates");
+        JsonNode tasks = parsed.get("tasks");
+        if (tasks == null || !tasks.isArray() || tasks.isEmpty()) {
+            System.out.println("[WARN] No tasks found in BA output - skipping Jira creation");
+            return;
+        }
+
+        int createdCount = 0;
+        java.util.Map<String, String> taskKeyById = new java.util.HashMap<>();
+        for (JsonNode task : tasks) {
+            String title = textAt(task, "/title");
+            String id = textAt(task, "/id");
+            String summary = title != null && !title.isBlank() ? title : "Task " + (id != null ? id : "(unnamed)");
+            String description = buildTaskDescription(task);
+
+            String ticketType = textAt(task, "/ticket_type");
+            String issueTypeName = resolveIssueType(ticketType, storyIssueType, taskIssueType);
+            String createdKey = jiraClient.createIssue(projectKey, issueTypeName, summary, description);
+            jiraClient.linkIssues(issueKey, createdKey, linkType);
+            createdCount++;
+            System.out.println("[SUCCESS] Created Jira issue: " + createdKey + " (" + summary + ")");
+
+            if (id != null && !id.isBlank()) {
+                taskKeyById.put(id, createdKey);
+            }
+
+            JsonNode subTickets = task.get("sub_tickets");
+            if (subTickets != null && subTickets.isArray() && !subTickets.isEmpty()) {
+                for (JsonNode subTicket : subTickets) {
+                    String subTitle = textAt(subTicket, "/title");
+                    String subId = textAt(subTicket, "/id");
+                    String subSummary = subTitle != null && !subTitle.isBlank()
+                            ? subTitle
+                            : "Question " + (subId != null ? subId : "(unnamed)");
+                    String subDescription = buildQuestionDescription(subTicket);
+
+                    String questionKey = jiraClient.createSubtask(projectKey, questionIssueType, createdKey,
+                            subSummary, subDescription);
+                    System.out.println("[SUCCESS] Created question subtask: " + questionKey + " (" + subSummary + ")");
+                }
+            }
+        }
+
+        System.out.println("[SUCCESS] Created " + createdCount + " Jira linked issues");
     }
 
     private static String loadSystemPrompt(String instructionsPath, String technicalReqPath) throws IOException {
@@ -130,5 +191,83 @@ public final class BaAssistantRunner {
         systemPrompt.append("\n\nIMPORTANT: Follow the instructions exactly. Return ONLY the strict JSON object.");
         System.out.println("[INFO] System prompt loaded (total length: " + systemPrompt.length() + " chars)");
         return systemPrompt.toString();
+    }
+
+    private static String buildTaskDescription(JsonNode task) {
+        StringBuilder sb = new StringBuilder();
+
+        String description = textAt(task, "/description");
+        String technicalNotes = textAt(task, "/technical_notes");
+        String type = textAt(task, "/type");
+        String storyPoints = textAt(task, "/story_points");
+
+        if (description != null && !description.isBlank()) {
+            sb.append("Description:\n").append(description).append("\n\n");
+        }
+
+        if (technicalNotes != null && !technicalNotes.isBlank()) {
+            sb.append("Technical Notes:\n").append(technicalNotes).append("\n\n");
+        }
+
+        if (type != null && !type.isBlank()) {
+            sb.append("Type: ").append(type).append("\n");
+        }
+
+        if (storyPoints != null && !storyPoints.isBlank()) {
+            sb.append("Story Points: ").append(storyPoints).append("\n");
+        }
+
+        JsonNode acceptance = task.get("acceptance_criteria");
+        if (acceptance != null && acceptance.isArray() && !acceptance.isEmpty()) {
+            sb.append("\nAcceptance Criteria:\n");
+            for (JsonNode item : acceptance) {
+                if (item != null && item.isTextual()) {
+                    sb.append("- ").append(item.asText()).append("\n");
+                }
+            }
+        }
+
+        String result = sb.toString().trim();
+        return result.isBlank() ? "See task details in BA output." : result;
+    }
+
+    private static String buildQuestionDescription(JsonNode subTicket) {
+        StringBuilder sb = new StringBuilder();
+
+        String description = textAt(subTicket, "/description");
+        String reason = textAt(subTicket, "/reason");
+
+        if (description != null && !description.isBlank()) {
+            sb.append("Description:\n").append(description).append("\n\n");
+        }
+
+        if (reason != null && !reason.isBlank()) {
+            sb.append("Reason:\n").append(reason).append("\n");
+        }
+
+        String result = sb.toString().trim();
+        return result.isBlank() ? "Question details required." : result;
+    }
+
+    private static String resolveIssueType(String ticketType, String storyIssueType, String taskIssueType) {
+        if (ticketType == null) {
+            return taskIssueType;
+        }
+        String normalized = ticketType.trim().toLowerCase();
+        if ("story".equals(normalized)) {
+            return storyIssueType;
+        }
+        return taskIssueType;
+    }
+
+    private static String textAt(JsonNode node, String pointer) {
+        if (node == null) {
+            return null;
+        }
+        JsonNode value = node.at(pointer);
+        if (value.isMissingNode() || value.isNull()) {
+            return null;
+        }
+        return value.asText(null);
     }
 }

@@ -25,7 +25,7 @@ You must return ONLY a JSON object with this structure:
 "tasks": [
 {
 "id": "T-001",
-"ticket_type": "epic | story | task",
+"ticket_type": "story | task",
 "story_points": 1,
 "type": "component | logic | styling | data",
 "title": "Task title",
@@ -39,7 +39,7 @@ You must return ONLY a JSON object with this structure:
 "sub_tickets": [
 {
 "id": "T-001-Q1",
-"ticket_type": "task",
+"ticket_type": "question",
 "title": "[Question] Specific question about a critical decision",
 "description": "Detailed context and question for decision-maker",
 "reason": "Why this decision requires human input (business-critical or technically-critical)"
@@ -63,15 +63,17 @@ You must return ONLY a JSON object with this structure:
 
 ## Ticket Type Selection
 
+Treat the triggering Jira ticket as the **epic**. Do NOT output epics in the JSON.
+
 You MUST decide the appropriate ticket type for each task based on complexity and scope:
 
-- **epic**: Use for large features that require multiple stories/tasks to complete. Epics should be broken down into smaller stories or tasks. Typically 13+ story points or requires coordination across multiple areas.
 - **story**: Use for medium-sized features that deliver user value but can be completed in a single sprint. Typically 3-8 story points.
 - **task**: Use for small, focused implementation work or technical tasks. Typically 1-3 story points.
 
 ## Decision-Making Guidelines
 
 **YOU MUST MAKE MOST DECISIONS AUTONOMOUSLY.** Evaluate options and choose the best approach based on:
+
 - Technical best practices and patterns from the project requirements
 - Performance, maintainability, and scalability considerations
 - Consistency with existing codebase patterns
@@ -86,6 +88,7 @@ You MUST decide the appropriate ticket type for each task based on complexity an
    - Examples: "Should we use SQL vs NoSQL database?", "Which authentication provider to integrate?", "Should we support real-time updates vs polling?"
 
 **Do NOT create question tickets for:**
+
 - Component structure or UI organization (decide based on best practices)
 - Styling details or layout choices (follow design system or modern conventions)
 - Variable/function naming (use clear, descriptive names)
@@ -95,12 +98,14 @@ You MUST decide the appropriate ticket type for each task based on complexity an
 ## Question Tickets Format
 
 When creating question sub-tickets:
-- MUST use ticket_type: "task"
+
+- MUST use ticket_type: "question"
 - MUST start title with "[Question]" prefix
 - MUST provide full context explaining why human input is needed
 - MUST clearly state the decision options being considered
 - MUST explain the business or technical implications of each option
 - Include the "reason" field explaining why this is business-critical or technically-critical
+- Question tickets are sub-tickets of the parent task they relate to
 - Question tickets do NOT block parent task execution unless explicitly stated
 
 # EXAMPLES
@@ -135,35 +140,7 @@ When creating question sub-tickets:
 }
 ```
 
-## Example 2: Epic with Multiple Stories
-
-```json
-{
-  "id": "T-002",
-  "ticket_type": "epic",
-  "story_points": 21,
-  "type": "component",
-  "title": "Build admin dashboard with user management",
-  "description": "Create comprehensive admin dashboard allowing administrators to manage users, view analytics, and configure system settings. This epic should be broken down into separate stories for each major area.",
-  "technical_notes": "Use modular component architecture. Each section (users, analytics, settings) should be a separate route with lazy loading.",
-  "dependencies": [],
-  "acceptance_criteria": [
-    "Admin dashboard is accessible with proper role-based permissions",
-    "All subsections are functional and tested"
-  ],
-  "sub_tickets": [
-    {
-      "id": "T-002-Q1",
-      "ticket_type": "task",
-      "title": "[Question] What level of analytics granularity is needed?",
-      "description": "Context: Building analytics dashboard for admins.\n\nOptions:\n1. Basic metrics: Total users, active users, daily signups\n2. Advanced metrics: Include user retention cohorts, feature usage heatmaps, conversion funnels\n3. Custom reports: Allow admins to build custom queries and reports\n\nConsiderations:\n- Advanced analytics require more complex data collection and storage\n- Custom reports need query builder UI and potentially separate analytics database\n- Basic metrics can be implemented quickly with existing data\n\nQuestion: What analytics capabilities should be included in the initial release?",
-      "reason": "Business-critical: Analytics scope significantly impacts development time and infrastructure requirements. Need stakeholder input on priority metrics."
-    }
-  ]
-}
-```
-
-## Example 3: Simple Task (No Questions)
+## Example 2: Simple Task (No Questions)
 
 ```json
 {
