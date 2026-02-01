@@ -71,6 +71,9 @@ public final class TechAssistantRunner {
         String combinedPrompt = systemPrompt + "\n\n" + userPrompt;
         Files.writeString(Path.of(promptOutputPath), combinedPrompt, StandardCharsets.UTF_8);
         System.out.println("[INFO] Wrote combined prompt to: " + promptOutputPath);
+        System.out.println("[INFO] Total prompt length: " + combinedPrompt.length() + " characters");
+        System.out.println("[DEBUG] Prompt preview (first 500 chars):");
+        System.out.println(combinedPrompt.substring(0, Math.min(500, combinedPrompt.length())) + "...");
 
         boolean outputPromptOnly = Env.optional("OUTPUT_PROMPT_ONLY", "false").equalsIgnoreCase("true");
 
