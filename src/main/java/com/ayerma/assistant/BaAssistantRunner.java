@@ -161,11 +161,8 @@ public final class BaAssistantRunner {
             String ticketType = textAt(task, "/ticket_type");
             String issueTypeName = resolveIssueType(ticketType, storyIssueType, taskIssueType);
             System.out.println("[DEBUG] Creating issue for task " + (id != null ? id : "(no-id)")
-                    + " with type=" + issueTypeName + ", summary=" + summary);
-            String createdKey = jiraClient.createIssue(projectKey, issueTypeName, summary, description);
-            System.out.println("[DEBUG] Linking issue " + createdKey + " to parent " + issueKey
-                    + " with link type " + linkType);
-            jiraClient.linkIssues(issueKey, createdKey, linkType);
+                    + " with type=" + issueTypeName + ", parent=" + issueKey + ", summary=" + summary);
+            String createdKey = jiraClient.createIssueWithParent(projectKey, issueTypeName, issueKey, summary, description);
             createdCount++;
             System.out.println("[SUCCESS] Created Jira issue: " + createdKey + " (" + summary + ")");
 
@@ -239,10 +236,6 @@ public final class BaAssistantRunner {
 
         if (type != null && !type.isBlank()) {
             sb.append("Type: ").append(type).append("\n");
-        }
-
-        if (storyPoints != null && !storyPoints.isBlank()) {
-            sb.append("Story Points: ").append(storyPoints).append("\n");
         }
 
         JsonNode acceptance = task.get("acceptance_criteria");

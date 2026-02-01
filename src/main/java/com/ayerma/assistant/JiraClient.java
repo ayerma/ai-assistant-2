@@ -74,6 +74,46 @@ public final class JiraClient {
         return keyNode.asText();
     }
 
+    public String createIssueWithParent(String projectKey, String issueTypeName, String parentKey, String summary,
+            String description) throws IOException, InterruptedException {
+        URI uri = URI.create(baseUrl + "/rest/api/3/issue");
+
+        System.out.println("[DEBUG] Jira createIssueWithParent => project=" + projectKey + ", type=" + issueTypeName
+                + ", parent=" + parentKey + ", summary=" + summary);
+
+        ObjectNode fields = HttpJson.MAPPER.createObjectNode();
+        fields.putObject("project").put("key", projectKey);
+        fields.putObject("issuetype").put("name", issueTypeName);
+        fields.putObject("parent").put("key", parentKey);
+        fields.put("summary", summary);
+
+        if (description != null && !description.isBlank()) {
+            fields.set("description", toAdf(description));
+        }
+
+        // Add DEV-AI label
+        ArrayNode labels = HttpJson.MAPPER.createArrayNode();
+        labels.add("DEV-AI");
+        fields.set("labels", labels);
+
+        ObjectNode payload = HttpJson.MAPPER.createObjectNode();
+        payload.set("fields", fields);
+
+        HttpRequest request = HttpJson.baseRequest(uri)
+                .header("Authorization", basicAuth(email, apiToken))
+                .header("Accept", "application/json")
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(payload.toString()))
+                .build();
+
+        JsonNode response = http.postJson(request);
+        JsonNode keyNode = response.get("key");
+        if (keyNode == null || keyNode.isNull()) {
+            throw new IOException("Jira issue creation response missing key");
+        }
+        return keyNode.asText();
+    }
+
     public String createSubtask(String projectKey, String issueTypeName, String parentKey, String summary,
             String description) throws IOException, InterruptedException {
         URI uri = URI.create(baseUrl + "/rest/api/3/issue");
