@@ -17,7 +17,7 @@ on:
         type: string
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
 
 jobs:
@@ -63,7 +63,7 @@ jobs:
           cd "$TARGET_REPO_PATH"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          
+
           if [ -n "$TARGET_REPO_TOKEN" ]; then
             git config credential.helper store
             echo "https://x-access-token:${TARGET_REPO_TOKEN}@github.com" > ~/.git-credentials
