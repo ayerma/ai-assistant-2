@@ -14,6 +14,13 @@ public final class TechAssistantRunner {
     public static void main(String[] args) throws Exception {
         System.out.println("[INFO] Starting Tech Assistant Runner...");
 
+        // Check if we're in ATTACH_PR mode
+        boolean attachPrMode = Env.optional("ATTACH_PR_TO_JIRA", "false").equalsIgnoreCase("true");
+        if (attachPrMode) {
+            attachPrToJira();
+            return;
+        }
+
         String issueKey = args.length > 0 ? args[0] : Env.required("JIRA_ISSUE_KEY");
         System.out.println("[INFO] Processing Jira issue: " + issueKey);
 
@@ -106,6 +113,42 @@ public final class TechAssistantRunner {
         Files.writeString(Path.of(outputPath),
                 HttpJson.MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(parsed), StandardCharsets.UTF_8);
         System.out.println("[SUCCESS] Wrote Tech output to: " + outputPath);
+    }
+
+    private static void attachPrToJira() throws Exception {
+        System.out.println("[INFO] ATTACH_PR_TO_JIRA mode - attaching PR URL to Jira ticket");
+
+        String issueKey = Env.required("JIRA_ISSUE_KEY");
+        String outputPath = Env.optional("TECH_OUTPUT_PATH", "tech-output.json");
+
+        System.out.println("[INFO] Reading tech output from: " + outputPath);
+        String jsonContent = Files.readString(Path.of(outputPath), StandardCharsets.UTF_8);
+        JsonNode output = HttpJson.MAPPER.readTree(jsonContent);
+
+        String prUrl = output.path("pull_request_url").asText(null);
+        String summary = output.path("summary").asText("");
+
+        if (prUrl == null || prUrl.isBlank()) {
+            throw new IllegalStateException("No pull_request_url found in tech output JSON");
+        }
+
+        System.out.println("[INFO] Found PR URL: " + prUrl);
+
+        String jiraBaseUrl = Env.required("JIRA_BASE_URL");
+        String jiraEmail = Env.required("JIRA_EMAIL");
+        String jiraApiToken = Env.required("JIRA_API_TOKEN");
+
+        HttpJson jiraHttp = new HttpJson();
+        JiraClient jira = new JiraClient(jiraHttp, jiraBaseUrl, jiraEmail, jiraApiToken);
+
+        String comment = "✅ Implementation completed\n\n";
+        if (!summary.isBlank()) {
+            comment += summary + "\n\n";
+        }
+        comment += "Pull Request: " + prUrl;
+
+        jira.addComment(issueKey, comment);
+        System.out.println("[SUCCESS] Attached PR URL to Jira ticket: " + issueKey);
     }
 
     private static String loadSystemPrompt(String devInstructionsPath, String technicalReqPath)

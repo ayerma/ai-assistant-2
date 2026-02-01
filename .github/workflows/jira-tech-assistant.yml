@@ -142,16 +142,40 @@ jobs:
           with open('tech-output-raw.txt', 'r') as f:
               content = f.read()
 
-          # Try to find JSON block
-          json_match = re.search(r'\{.*\}', content, re.DOTALL)
-          if json_match:
-              json_str = json_match.group(0)
-              parsed = json.loads(json_str)
+          print('[DEBUG] Raw output length:', len(content))
+          print('[DEBUG] First 500 chars:', content[:500])
+
+          # Try to find JSON block with more robust patterns
+          # Look for JSON starting with { and ending with }
+          json_patterns = [
+              r'\`\`\`json\s*(\{.*?\})\s*\`\`\`',  # Markdown code block
+              r'\`\`\`\s*(\{.*?\})\s*\`\`\`',      # Generic code block
+              r'(\{[\s\S]*\"tasks\"[\s\S]*\})',     # JSON with tasks field
+              r'(\{.*\})',                          # Any JSON-like structure
+          ]
+
+          parsed = None
+          for pattern in json_patterns:
+              json_match = re.search(pattern, content, re.DOTALL)
+              if json_match:
+                  json_str = json_match.group(1) if json_match.lastindex else json_match.group(0)
+                  try:
+                      parsed = json.loads(json_str)
+                      print(f'[SUCCESS] Extracted JSON using pattern: {pattern[:30]}...')
+                      break
+                  except json.JSONDecodeError as e:
+                      print(f'[DEBUG] Pattern matched but invalid JSON: {e}')
+                      continue
+
+          if parsed:
               with open('tech-output.json', 'w') as out:
                   json.dump(parsed, out, indent=2)
-              print('[SUCCESS] Extracted and wrote JSON output')
+              print('[SUCCESS] Wrote JSON output to tech-output.json')
           else:
-              print('[ERROR] No JSON found in copilot output')
+              print('[ERROR] No valid JSON found in copilot output')
+              print('[DEBUG] Saving raw output for inspection')
+              with open('tech-output-raw-debug.txt', 'w') as f:
+                  f.write(content)
               exit(1)
           "
 
@@ -159,4 +183,19 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: tech-output
-          path: tech-output.json
+          path: |
+            tech-output.json
+            tech-output-raw.txt
+
+      - name: Attach PR URL to Jira
+        if: ${{ vars.USE_MODELS_API == 'false' }}
+        working-directory: ${{ env.TARGET_REPO_PATH }}
+        env:
+          ATTACH_PR_TO_JIRA: true
+          JIRA_ISSUE_KEY: ${{ github.event.inputs.jira_issue_key }}
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          TECH_OUTPUT_PATH: tech-output.json
+        run: |
+          java -jar ${{ github.workspace }}/target/ba-assistant-uber.jar

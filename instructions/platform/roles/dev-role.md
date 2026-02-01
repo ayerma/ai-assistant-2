@@ -26,3 +26,16 @@ Take the Jira ticket description and implement the requested work with a strict 
 - Include the relevant technical guides and repo context in the prompt before generating output.
 - Create a new branch from `main` with a meaningful name before making changes.
 - After implementation, open a pull request describing the changes.
+
+# OUTPUT FORMAT (STRICT JSON)
+
+After completing the implementation and opening the pull request, return ONLY a JSON object with this structure:
+
+```json
+{
+  "pull_request_url": "https://github.com/owner/repo/pull/123",
+  "summary": "Brief description of what was implemented"
+}
+```
+
+The `pull_request_url` will be attached to the Jira ticket automatically.

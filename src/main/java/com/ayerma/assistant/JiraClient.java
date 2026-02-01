@@ -184,7 +184,26 @@ public final class JiraClient {
         }
         return value;
     }
+    public void addComment(String issueKey, String comment) throws IOException, InterruptedException {
+        String encoded = URLEncoder.encode(issueKey, StandardCharsets.UTF_8);
+        URI uri = URI.create(baseUrl + "/rest/api/3/issue/" + encoded + "/comment");
 
+        System.out.println("[DEBUG] Adding comment to issue: " + issueKey);
+
+        ObjectNode body = HttpJson.MAPPER.createObjectNode();
+        body.set("body", toAdf(comment));
+
+        String payload = HttpJson.MAPPER.writeValueAsString(body);
+        HttpRequest request = HttpJson.baseRequest(uri)
+                .header("Authorization", basicAuth(email, apiToken))
+                .header("Content-Type", "application/json")
+                .header("Accept", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(payload))
+                .build();
+
+        JsonNode response = http.postJson(request);
+        System.out.println("[SUCCESS] Added comment to " + issueKey);
+    }
     private static ObjectNode toAdf(String text) {
         ObjectNode doc = HttpJson.MAPPER.createObjectNode();
         doc.put("type", "doc");
