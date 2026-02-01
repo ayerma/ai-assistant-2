@@ -126,6 +126,27 @@ jobs:
               exit(1)
           "
 
+      - name: Create Jira tickets from output
+        if: ${{ vars.USE_MODELS_API == 'false' }}
+        env:
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+
+          JIRA_STORY_ISSUE_TYPE: ${{ vars.JIRA_STORY_ISSUE_TYPE || 'Story' }}
+          JIRA_TASK_ISSUE_TYPE: ${{ vars.JIRA_TASK_ISSUE_TYPE || 'Task' }}
+          JIRA_QUESTION_ISSUE_TYPE: ${{ vars.JIRA_QUESTION_ISSUE_TYPE || 'Sub-task' }}
+          JIRA_LINK_TYPE: ${{ vars.JIRA_LINK_TYPE || 'Relates' }}
+
+          JIRA_ISSUE_KEY: ${{ inputs.ticket_id }}
+
+          # Read from the extracted ba-output.json
+          BA_OUTPUT_PATH: ba-output.json
+          CREATE_JIRA_FROM_OUTPUT: true
+        run: |
+          echo "Creating Jira tickets from ba-output.json..."
+          java -jar target/ai-assistant-2-automation-0.1.0-all.jar
+
       - name: Upload result
         uses: actions/upload-artifact@v4
         with:

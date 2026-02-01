@@ -40,7 +40,7 @@ public final class JiraClient {
         URI uri = URI.create(baseUrl + "/rest/api/3/issue");
 
         System.out.println("[DEBUG] Jira createIssue => project=" + projectKey + ", type=" + issueTypeName
-            + ", summary=" + summary);
+                + ", summary=" + summary);
 
         ObjectNode fields = HttpJson.MAPPER.createObjectNode();
         fields.putObject("project").put("key", projectKey);
@@ -74,7 +74,7 @@ public final class JiraClient {
         URI uri = URI.create(baseUrl + "/rest/api/3/issue");
 
         System.out.println("[DEBUG] Jira createSubtask => project=" + projectKey + ", type=" + issueTypeName
-            + ", parent=" + parentKey + ", summary=" + summary);
+                + ", parent=" + parentKey + ", summary=" + summary);
 
         ObjectNode fields = HttpJson.MAPPER.createObjectNode();
         fields.putObject("project").put("key", projectKey);

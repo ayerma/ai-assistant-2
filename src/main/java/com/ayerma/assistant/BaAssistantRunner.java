@@ -21,6 +21,26 @@ public final class BaAssistantRunner {
         String jiraEmail = Env.required("JIRA_EMAIL");
         String jiraApiToken = Env.required("JIRA_API_TOKEN");
 
+        HttpJson jiraHttp = new HttpJson();
+        JiraClient jiraClient = new JiraClient(jiraHttp, jiraBaseUrl, jiraEmail, jiraApiToken);
+
+        String outputPath = Env.optional("BA_OUTPUT_PATH", "ba-output.json");
+
+        // Check if we should create Jira tickets from existing output file (CLI workflow post-processing)
+        boolean createFromOutput = Env.optional("CREATE_JIRA_FROM_OUTPUT", "false").equalsIgnoreCase("true");
+        if (createFromOutput) {
+            System.out.println("[INFO] CREATE_JIRA_FROM_OUTPUT mode - reading from " + outputPath);
+            
+            // Read and parse the BA output JSON file
+            String outputContent = Files.readString(Path.of(outputPath), StandardCharsets.UTF_8);
+            JsonNode parsed = HttpJson.MAPPER.readTree(outputContent);
+            System.out.println("[INFO] Successfully loaded BA output from file");
+            
+            // Create Jira tickets from the parsed output
+            createJiraTicketsFromOutput(jiraClient, issueKey, parsed);
+            return;
+        }
+
         // Determine which client to use
         boolean useModelsApi = Env.optional("USE_MODELS_API", "true").equalsIgnoreCase("true");
         System.out.println("[INFO] Client mode: " + (useModelsApi ? "GitHub Models API" : "GitHub Copilot CLI"));
@@ -39,13 +59,9 @@ public final class BaAssistantRunner {
         String instructionsPath = Env.optional("BA_INSTRUCTIONS_PATH", "instructions/platform/roles/ba-role.md");
         String technicalReqPath = Env.optional("TECHNICAL_REQUIREMENTS_PATH",
                 "instructions/platform/technical/technical-requirements.md");
-        String outputPath = Env.optional("BA_OUTPUT_PATH", "ba-output.json");
 
         System.out.println("[INFO] Loading instructions from: " + instructionsPath);
         String systemPrompt = loadSystemPrompt(instructionsPath, technicalReqPath);
-
-        HttpJson jiraHttp = new HttpJson();
-        JiraClient jiraClient = new JiraClient(jiraHttp, jiraBaseUrl, jiraEmail, jiraApiToken);
 
         // Check if summary and description are provided to skip Jira API call
         String providedSummary = Env.optional("JIRA_ISSUE_SUMMARY", null);
@@ -107,13 +123,14 @@ public final class BaAssistantRunner {
                 HttpJson.MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(parsed), StandardCharsets.UTF_8);
         System.out.println("[SUCCESS] Wrote BA output to: " + outputPath);
 
+        // Create Jira tickets from the parsed output
+        createJiraTicketsFromOutput(jiraClient, issueKey, parsed);
+    }
+
+    private static void createJiraTicketsFromOutput(JiraClient jiraClient, String issueKey, JsonNode parsed) throws Exception {
         System.out.println("[INFO] Creating Jira linked issues from BA output...");
 
-        if (issue == null) {
-            System.out.println("[INFO] Loading parent issue for task creation...");
-            issue = jiraClient.getIssue(issueKey);
-        }
-
+        JsonNode issue = jiraClient.getIssue(issueKey);
         String projectKey = textAt(issue, "/fields/project/key");
         if (projectKey == null || projectKey.isBlank()) {
             throw new IllegalStateException("Unable to resolve project key from Jira issue: " + issueKey);
@@ -124,7 +141,7 @@ public final class BaAssistantRunner {
         String questionIssueType = Env.optional("JIRA_QUESTION_ISSUE_TYPE", "Sub-task");
         String linkType = Env.optional("JIRA_LINK_TYPE", "Relates");
         System.out.println("[DEBUG] Issue types => story: " + storyIssueType + ", task: " + taskIssueType
-            + ", question: " + questionIssueType + ", link: " + linkType);
+                + ", question: " + questionIssueType + ", link: " + linkType);
         JsonNode tasks = parsed.get("tasks");
         if (tasks == null || !tasks.isArray() || tasks.isEmpty()) {
             System.out.println("[WARN] No tasks found in BA output - skipping Jira creation");
@@ -144,10 +161,10 @@ public final class BaAssistantRunner {
             String ticketType = textAt(task, "/ticket_type");
             String issueTypeName = resolveIssueType(ticketType, storyIssueType, taskIssueType);
             System.out.println("[DEBUG] Creating issue for task " + (id != null ? id : "(no-id)")
-                + " with type=" + issueTypeName + ", summary=" + summary);
+                    + " with type=" + issueTypeName + ", summary=" + summary);
             String createdKey = jiraClient.createIssue(projectKey, issueTypeName, summary, description);
             System.out.println("[DEBUG] Linking issue " + createdKey + " to parent " + issueKey
-                + " with link type " + linkType);
+                    + " with link type " + linkType);
             jiraClient.linkIssues(issueKey, createdKey, linkType);
             createdCount++;
             System.out.println("[SUCCESS] Created Jira issue: " + createdKey + " (" + summary + ")");
