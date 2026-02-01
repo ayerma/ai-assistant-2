@@ -26,16 +26,17 @@ public final class BaAssistantRunner {
 
         String outputPath = Env.optional("BA_OUTPUT_PATH", "ba-output.json");
 
-        // Check if we should create Jira tickets from existing output file (CLI workflow post-processing)
+        // Check if we should create Jira tickets from existing output file (CLI
+        // workflow post-processing)
         boolean createFromOutput = Env.optional("CREATE_JIRA_FROM_OUTPUT", "false").equalsIgnoreCase("true");
         if (createFromOutput) {
             System.out.println("[INFO] CREATE_JIRA_FROM_OUTPUT mode - reading from " + outputPath);
-            
+
             // Read and parse the BA output JSON file
             String outputContent = Files.readString(Path.of(outputPath), StandardCharsets.UTF_8);
             JsonNode parsed = HttpJson.MAPPER.readTree(outputContent);
             System.out.println("[INFO] Successfully loaded BA output from file");
-            
+
             // Create Jira tickets from the parsed output
             createJiraTicketsFromOutput(jiraClient, issueKey, parsed);
             return;
@@ -127,14 +128,13 @@ public final class BaAssistantRunner {
         createJiraTicketsFromOutput(jiraClient, issueKey, parsed);
     }
 
-    private static void createJiraTicketsFromOutput(JiraClient jiraClient, String issueKey, JsonNode parsed) throws Exception {
+    private static void createJiraTicketsFromOutput(JiraClient jiraClient, String issueKey, JsonNode parsed)
+            throws Exception {
         System.out.println("[INFO] Creating Jira linked issues from BA output...");
 
-        JsonNode issue = jiraClient.getIssue(issueKey);
-        String projectKey = textAt(issue, "/fields/project/key");
-        if (projectKey == null || projectKey.isBlank()) {
-            throw new IllegalStateException("Unable to resolve project key from Jira issue: " + issueKey);
-        }
+        // Extract project key from issue key (e.g., "IN-1" -> "IN")
+        String projectKey = issueKey.contains("-") ? issueKey.substring(0, issueKey.indexOf('-')) : issueKey;
+        System.out.println("[INFO] Extracted project key: " + projectKey + " from issue: " + issueKey);
 
         String storyIssueType = Env.optional("JIRA_STORY_ISSUE_TYPE", "Story");
         String taskIssueType = Env.optional("JIRA_TASK_ISSUE_TYPE", "Task");
