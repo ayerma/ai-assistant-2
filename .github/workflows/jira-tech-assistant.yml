@@ -27,7 +27,7 @@ jobs:
       TARGET_REPO: ${{ vars.TARGET_REPO }}
       TARGET_REF: ${{ vars.TARGET_REF || 'main' }}
       TARGET_REPO_PATH: ${{ vars.TARGET_REPO_PATH || 'target-repo' }}
-      TARGET_REPO_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+      TARGET_REPO_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
 
     steps:
       - name: Checkout
