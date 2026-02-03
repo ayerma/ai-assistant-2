@@ -151,50 +151,64 @@ jobs:
         run: |
           echo "Calling Copilot CLI..."
           copilot --allow-all-tools -p "$(cat tech-prompt.txt)" > tech-output-raw.txt
-
+          
           echo "Extracting JSON from output..."
           python3 -c "
           import re
           import json
+          import sys
 
           with open('tech-output-raw.txt', 'r') as f:
               content = f.read()
 
           print('[DEBUG] Raw output length:', len(content))
-          print('[DEBUG] First 500 chars:', content[:500])
+          print('[DEBUG] Last 1000 chars:', content[-1000:])
 
-          # Try to find JSON block with more robust patterns
-          # Look for JSON starting with { and ending with }
+          # Try multiple JSON extraction strategies
           json_patterns = [
-              r'\`\`\`json\s*(\{.*?\})\s*\`\`\`',  # Markdown code block
-              r'\`\`\`\s*(\{.*?\})\s*\`\`\`',      # Generic code block
-              r'(\{[\s\S]*\"tasks\"[\s\S]*\})',     # JSON with tasks field
-              r'(\{.*\})',                          # Any JSON-like structure
+              # Look for JSON in code blocks
+              (r'\`\`\`json\s*(\{[^\`]*\})\s*\`\`\`', 'json code block'),
+              (r'\`\`\`\s*(\{[^\`]*\})\s*\`\`\`', 'generic code block'),
+              # Look for pull_request_url specifically (our expected format)
+              (r'(\{[^}]*\"pull_request_url\"[^}]*\"summary\"[^}]*\})', 'PR URL format'),
+              # Look for any JSON object with these fields
+              (r'(\{(?:[^{}]|\{[^{}]*\})*\"pull_request_url\"(?:[^{}]|\{[^{}]*\})*\})', 'nested PR format'),
+              # Last resort: any valid JSON object at the end
+              (r'(\{[^\{]*\})\s*$', 'trailing JSON'),
           ]
 
           parsed = None
-          for pattern in json_patterns:
-              json_match = re.search(pattern, content, re.DOTALL)
-              if json_match:
-                  json_str = json_match.group(1) if json_match.lastindex else json_match.group(0)
+          for pattern, desc in json_patterns:
+              matches = re.finditer(pattern, content, re.DOTALL | re.MULTILINE)
+              for match in matches:
+                  json_str = match.group(1)
                   try:
-                      parsed = json.loads(json_str)
-                      print(f'[SUCCESS] Extracted JSON using pattern: {pattern[:30]}...')
-                      break
-                  except json.JSONDecodeError as e:
-                      print(f'[DEBUG] Pattern matched but invalid JSON: {e}')
+                      candidate = json.loads(json_str)
+                      # Validate it has expected fields
+                      if isinstance(candidate, dict) and 'pull_request_url' in candidate:
+                          parsed = candidate
+                          print(f'[SUCCESS] Extracted JSON using: {desc}')
+                          break
+                  except json.JSONDecodeError:
                       continue
+              if parsed:
+                  break
 
           if parsed:
               with open('tech-output.json', 'w') as out:
                   json.dump(parsed, out, indent=2)
               print('[SUCCESS] Wrote JSON output to tech-output.json')
           else:
-              print('[ERROR] No valid JSON found in copilot output')
-              print('[DEBUG] Saving raw output for inspection')
-              with open('tech-output-raw-debug.txt', 'w') as f:
-                  f.write(content)
-              exit(1)
+              print('[ERROR] No valid JSON with pull_request_url found in copilot output')
+              print('[INFO] Creating placeholder output - PR URL may need manual extraction')
+              # Create a placeholder that won't break the workflow
+              placeholder = {
+                  'pull_request_url': 'ERROR: Could not extract PR URL from copilot output',
+                  'summary': 'Manual review required - check tech-output-raw.txt'
+              }
+              with open('tech-output.json', 'w') as out:
+                  json.dump(placeholder, out, indent=2)
+              print('[WARN] Created placeholder output, workflow will continue')
           "
 
       - name: Upload result
