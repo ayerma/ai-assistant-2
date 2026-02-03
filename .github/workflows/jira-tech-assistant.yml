@@ -202,6 +202,7 @@ jobs:
         with:
           name: tech-output
           path: |
+            ${{ env.TARGET_REPO_PATH }}/tech-prompt.txt
             ${{ env.TARGET_REPO_PATH }}/tech-output.json
             ${{ env.TARGET_REPO_PATH }}/tech-output-raw.txt
 
