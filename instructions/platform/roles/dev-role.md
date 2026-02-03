@@ -25,6 +25,10 @@ Take the Jira ticket description and implement the requested work with a strict 
 - Keep language precise and implementation-focused.
 - Include the relevant technical guides and repo context in the prompt before generating output.
 - Create a new branch from `main` with a meaningful name before making changes.
+- **IMPORTANT**: Only commit source code and configuration files. Exclude all temporary files like:
+  - `tech-prompt.txt`, `tech-output.json`, `tech-output-raw.txt`
+  - Any workflow artifacts or generated test outputs
+  - Build artifacts, logs, or cache files
 - After implementation, open a pull request describing the changes.
 
 # OUTPUT FORMAT (STRICT JSON)

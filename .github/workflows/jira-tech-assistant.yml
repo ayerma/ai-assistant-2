@@ -273,33 +273,38 @@ jobs:
           GH_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
         run: |
           echo "[INFO] Automerge enabled - attempting to merge PR"
-          
+
           # Extract PR URL from tech-output.json
           PR_URL=$(python3 -c "import json; data=json.load(open('tech-output.json')); print(data.get('pull_request_url', ''))")
-          
+
           if [ -z "$PR_URL" ] || [[ "$PR_URL" == *"ERROR"* ]]; then
             echo "[WARN] No valid PR URL found - skipping automerge"
             exit 0
           fi
-          
+
           echo "[INFO] PR URL: $PR_URL"
-          
+
           # Extract PR number from URL
           PR_NUMBER=$(echo "$PR_URL" | grep -oP '/pull/\K[0-9]+')
-          
+
           if [ -z "$PR_NUMBER" ]; then
             echo "[ERROR] Could not extract PR number from URL: $PR_URL"
             exit 0
           fi
-          
+
+          echo "[INFO] Cleaning up temporary files before merge"
+          # Stash any uncommitted changes (temporary files) to avoid conflicts
+          git add -A
+          git stash || echo "[INFO] Nothing to stash"
+
           echo "[INFO] Merging PR #$PR_NUMBER"
-          
+
           # Use GitHub CLI to merge the PR
           gh pr merge "$PR_NUMBER" --merge --delete-branch || {
             echo "[WARN] Auto-merge failed - PR may require review or have conflicts"
             exit 0
           }
-          
+
           echo "[SUCCESS] PR #$PR_NUMBER merged successfully"
           echo "MERGE_SUCCESS=true" >> $GITHUB_ENV
 
@@ -313,7 +318,7 @@ jobs:
           JIRA_DONE_TRANSITION_ID: ${{ vars.JIRA_DONE_TRANSITION_ID || '31' }}
         run: |
           echo "[INFO] Transitioning Jira ticket $JIRA_ISSUE_KEY to Done"
-          
+
           # Transition the ticket to Done status
           curl -X POST \
             -u "$JIRA_EMAIL:$JIRA_API_TOKEN" \
@@ -323,5 +328,5 @@ jobs:
             echo "[WARN] Failed to transition ticket - check JIRA_DONE_TRANSITION_ID configuration"
             exit 0
           }
-          
+
           echo "[SUCCESS] Jira ticket $JIRA_ISSUE_KEY transitioned to Done"
