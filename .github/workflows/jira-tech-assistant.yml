@@ -15,11 +15,6 @@ on:
         description: "Jira issue description (optional, will fetch if not provided)"
         required: false
         type: string
-      automerge:
-        description: "Automatically merge PR and mark ticket as Done"
-        required: false
-        type: boolean
-        default: false
 
 permissions:
   contents: write
@@ -272,7 +267,7 @@ jobs:
           java -cp "$GITHUB_WORKSPACE/target/ai-assistant-2-automation-0.1.0-all.jar" com.ayerma.assistant.TechAssistantRunner
 
       - name: Auto-merge PR
-        if: ${{ inputs.automerge == true }}
+        if: ${{ vars.AUTOMERGE == 'true' }}
         working-directory: ${{ env.TARGET_REPO_PATH }}
         env:
           GH_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
@@ -309,7 +304,7 @@ jobs:
           echo "MERGE_SUCCESS=true" >> $GITHUB_ENV
 
       - name: Transition Jira ticket to Done
-        if: ${{ inputs.automerge == true && env.MERGE_SUCCESS == 'true' }}
+        if: ${{ vars.AUTOMERGE == 'true' && env.MERGE_SUCCESS == 'true' }}
         env:
           JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
           JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
