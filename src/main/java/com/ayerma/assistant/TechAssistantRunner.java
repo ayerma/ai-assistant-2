@@ -155,23 +155,27 @@ public final class TechAssistantRunner {
             throws IOException {
         StringBuilder systemPrompt = new StringBuilder();
 
-        System.out.println("[INFO] Loading senior developer instructions...");
+        System.out.println("[INFO] Loading senior developer instructions from: " + devInstructionsPath);
         String devInstructions = Files.readString(Path.of(devInstructionsPath), StandardCharsets.UTF_8);
         systemPrompt.append(devInstructions);
+        System.out.println("[SUCCESS] Dev instructions loaded (" + devInstructions.length() + " chars)");
 
         Path techPath = Path.of(technicalReqPath);
         if (Files.exists(techPath)) {
-            System.out.println("[INFO] Loading technical requirements from: " + technicalReqPath);
+            System.out.println("[INFO] Technical requirements file found: " + technicalReqPath);
+            System.out.println("[INFO] Loading technical requirements...");
             systemPrompt.append("\n\n---\n\n");
             systemPrompt.append("## Technical Requirements\n\n");
             String techRequirements = Files.readString(techPath, StandardCharsets.UTF_8);
             systemPrompt.append(techRequirements);
+            System.out.println("[SUCCESS] Technical requirements loaded (" + techRequirements.length() + " chars)");
         } else {
-            System.out.println("[WARN] Technical requirements file not found: " + technicalReqPath);
+            System.out.println("[WARN] Technical requirements file NOT FOUND at: " + technicalReqPath);
+            System.out.println("[WARN] Continuing without technical requirements");
         }
 
         systemPrompt.append("\n\nIMPORTANT: Follow the instructions exactly. Return ONLY the strict JSON object.");
-        System.out.println("[INFO] System prompt loaded (total length: " + systemPrompt.length() + " chars)");
+        System.out.println("[SUCCESS] System prompt finalized (total length: " + systemPrompt.length() + " chars)");
         return systemPrompt.toString();
     }
 
