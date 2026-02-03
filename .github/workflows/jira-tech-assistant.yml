@@ -220,6 +220,33 @@ jobs:
             ${{ env.TARGET_REPO_PATH }}/tech-output.json
             ${{ env.TARGET_REPO_PATH }}/tech-output-raw.txt
 
+      - name: Check for extraction issues and notify Jira
+        if: ${{ vars.USE_MODELS_API == 'false' }}
+        working-directory: ${{ env.TARGET_REPO_PATH }}
+        env:
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          JIRA_ISSUE_KEY: ${{ inputs.ticket_id }}
+        run: |
+          echo "Checking if JSON extraction succeeded..."
+          if grep -q "ERROR: Could not extract PR URL" tech-output.json; then
+            echo "[WARN] JSON extraction failed - posting warning to Jira"
+            
+            COMMENT="⚠️ **Tech Assistant Warning**\n\nCopilot CLI completed execution but the output format was unexpected.\n\nThe implementation may have been completed, but the Pull Request URL could not be automatically extracted.\n\n**Action Required:**\n1. Check the workflow artifacts for \`tech-output-raw.txt\` to review the full output\n2. Manually locate any created Pull Requests in the repository\n3. If a PR was created, attach it to this ticket\n\n[View Workflow Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+            
+            # Use curl to post comment to Jira
+            curl -X POST \
+              -u "$JIRA_EMAIL:$JIRA_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "{\"body\": \"$COMMENT\"}" \
+              "$JIRA_BASE_URL/rest/api/2/issue/$JIRA_ISSUE_KEY/comment"
+            
+            echo "[INFO] Warning comment posted to Jira ticket"
+          else
+            echo "[SUCCESS] JSON extraction succeeded, proceeding normally"
+          fi
+
       - name: Attach PR URL to Jira
         if: ${{ vars.USE_MODELS_API == 'false' }}
         working-directory: ${{ env.TARGET_REPO_PATH }}
@@ -231,4 +258,10 @@ jobs:
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
           TECH_OUTPUT_PATH: tech-output.json
         run: |
+          # Skip if we have placeholder/error JSON
+          if grep -q "ERROR: Could not extract PR URL" tech-output.json; then
+            echo "[INFO] Skipping PR attachment due to extraction failure (warning already posted)"
+            exit 0
+          fi
+          
           java -cp "$GITHUB_WORKSPACE/target/ai-assistant-2-automation-0.1.0-all.jar" com.ayerma.assistant.TechAssistantRunner
