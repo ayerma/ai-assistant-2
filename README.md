@@ -90,5 +90,3 @@ The JSON output includes:
 - `story_points`: 1-3 for tasks, 5-8 for stories
 - `sub_tickets`: Array of question tickets when critical decisions are needed (created as Jira subtasks)
 - Each question ticket includes context, options, and reasoning for why human input is required
-
-See `instructions/platform/roles/ba-role.md` for detailed examples and guidelines.
