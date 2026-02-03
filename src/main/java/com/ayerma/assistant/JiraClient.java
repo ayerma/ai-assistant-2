@@ -206,6 +206,35 @@ public final class JiraClient {
         System.out.println("[SUCCESS] Added comment to " + issueKey);
     }
 
+    public void addLabels(String issueKey, String... labels) throws IOException, InterruptedException {
+        String encoded = URLEncoder.encode(issueKey, StandardCharsets.UTF_8);
+        URI uri = URI.create(baseUrl + "/rest/api/3/issue/" + encoded);
+
+        System.out.println("[DEBUG] Adding labels to issue: " + issueKey + " => " + String.join(", ", labels));
+
+        ObjectNode update = HttpJson.MAPPER.createObjectNode();
+        ArrayNode labelsArray = HttpJson.MAPPER.createArrayNode();
+        for (String label : labels) {
+            ObjectNode addOp = HttpJson.MAPPER.createObjectNode();
+            addOp.put("add", label);
+            labelsArray.add(addOp);
+        }
+        update.set("labels", labelsArray);
+
+        ObjectNode payload = HttpJson.MAPPER.createObjectNode();
+        payload.set("update", update);
+
+        HttpRequest request = HttpJson.baseRequest(uri)
+                .header("Authorization", basicAuth(email, apiToken))
+                .header("Content-Type", "application/json")
+                .header("Accept", "application/json")
+                .method("PUT", HttpRequest.BodyPublishers.ofString(payload.toString()))
+                .build();
+
+        http.send(request);
+        System.out.println("[SUCCESS] Added labels to " + issueKey);
+    }
+
     private static ObjectNode toAdf(String text) {
         ObjectNode doc = HttpJson.MAPPER.createObjectNode();
         doc.put("type", "doc");

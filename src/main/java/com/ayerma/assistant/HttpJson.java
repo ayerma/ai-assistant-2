@@ -42,6 +42,14 @@ public final class HttpJson {
         return MAPPER.readTree(response.body());
     }
 
+    public void send(HttpRequest request) throws IOException, InterruptedException {
+        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        int status = response.statusCode();
+        if (status < 200 || status >= 300) {
+            throw new IOException("HTTP " + status + " for " + request.uri() + ": " + truncate(response.body()));
+        }
+    }
+
     public static HttpRequest.Builder baseRequest(URI uri) {
         return HttpRequest.newBuilder(uri)
                 .timeout(Duration.ofSeconds(60));
