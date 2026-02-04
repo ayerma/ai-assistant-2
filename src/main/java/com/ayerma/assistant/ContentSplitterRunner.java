@@ -148,7 +148,6 @@ public final class ContentSplitterRunner {
         int createdCount = 0;
         for (JsonNode subtopic : subtopics) {
             String title = textAt(subtopic, "/title");
-            String description = textAt(subtopic, "/description");
 
             String summary = title != null && !title.isBlank() ? title : "Content Subtopic";
 
@@ -156,7 +155,7 @@ public final class ContentSplitterRunner {
                     + ", summary=" + summary);
 
             String createdKey = jiraClient.createIssueWithParentAndLabels(projectKey, taskIssueType, issueKey, summary,
-                    description, "Content-breaker");
+                    null, "Content-breaker");
             createdCount++;
             System.out.println("[SUCCESS] Created Jira task: " + createdKey + " (" + summary + ")");
         }
