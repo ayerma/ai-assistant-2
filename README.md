@@ -141,12 +141,14 @@ The Content-Splitter assistant analyzes content-focused Jira tickets and automat
 ### Example
 
 **Input Ticket:**
+
 ```
 Title: Create developer documentation for REST API
 Description: Need comprehensive docs covering authentication, endpoints, error handling, and examples
 ```
 
 **Output (Jira Tasks Created):**
+
 - `PROJ-124`: Getting Started and Authentication [Content-breaker]
 - `PROJ-125`: Endpoint Reference - User Management [Content-breaker]
 - `PROJ-126`: Endpoint Reference - Data Operations [Content-breaker]
@@ -162,6 +164,124 @@ All tasks are linked to `PROJ-123` as child tasks.
 ### Dual-Mode Support
 
 Like other assistants, Content-Splitter supports both:
+
 - **GitHub Models API mode** (default): Direct API calls to AI model
 - **GitHub Copilot CLI mode**: Uses local Copilot CLI (set `USE_MODELS_API=false`)
 
+## Content-Creator Assistant
+
+The Content-Creator assistant generates comprehensive Java interview questions with detailed answers based on a given topic from a Jira ticket.
+
+### Purpose
+
+- Takes a Jira ticket with a Java topic as the summary/title
+- Generates 8-12 most common interview questions for that topic
+- Provides comprehensive, senior-level answers for each question
+- Enriches the parent Jira ticket by adding formatted Q&A content as a comment
+- Labels the ticket with `interview-content` and `ai-generated`
+
+### How It Works
+
+1. Takes a Jira ticket where the summary/title represents a Java topic (e.g., "Java Streams API", "Java Concurrency")
+2. AI acts as a senior Java developer with 15+ years experience
+3. Generates the most frequently asked interview questions for that topic
+4. Provides detailed, production-ready answers with examples and best practices
+5. Adds formatted Q&A content to the Jira ticket as a comment
+
+### Usage
+
+**Manual Trigger (GitHub Actions):**
+
+```bash
+# Navigate to Actions > Jira -> Content-Creator
+# Click "Run workflow"
+# Enter ticket_id (e.g., PROJ-123)
+# Optionally provide ticket_summary (topic name)
+```
+
+**Command-Line Execution:**
+
+```bash
+# Using GitHub Models API (default)
+java -cp target/ba-assistant-1.0.jar com.ayerma.assistant.ContentCreatorRunner PROJ-123
+
+# Using GitHub Copilot CLI
+USE_MODELS_API=false \
+java -cp target/ba-assistant-1.0.jar com.ayerma.assistant.ContentCreatorRunner PROJ-123
+
+# With custom model (uses gpt-5 by default)
+MODELS_MODEL=gpt-5 \
+java -cp target/ba-assistant-1.0.jar com.ayerma.assistant.ContentCreatorRunner PROJ-123
+```
+
+**Environment Variables:**
+
+- `CONTENT_CREATOR_INSTRUCTIONS_PATH` (default: `instructions/platform/roles/content-creator-role.md`)
+- `CONTENT_CREATOR_OUTPUT_PATH` (default: `content-creator-output.json`)
+- `CONTENT_CREATOR_PROMPT_OUTPUT_PATH` (default: `content-creator-prompt.txt`)
+- `USE_MODELS_API` (default: `true`) - set to `false` to use GitHub Copilot CLI
+- `MODELS_MODEL` (default: `gpt-5`) - uses latest GPT-5 model for highest quality
+- `COPILOT_CLI_COMMAND` (default: `copilot`) - CLI executable name
+- `OUTPUT_PROMPT_ONLY` (default: `false`) - set to `true` to generate prompt and exit
+- `ENRICH_JIRA_FROM_OUTPUT` (default: `false`) - set to `true` to enrich Jira from existing JSON output
+
+**Output Files:**
+
+- `content-creator-prompt.txt` - Generated prompt combining role instructions and topic
+- `content-creator-output.json` - AI-generated JSON with interview questions and answers
+
+### Example
+
+**Input Ticket:**
+
+```
+Jira Issue: PROJ-123
+Title/Summary: Java Streams API
+```
+
+**Output JSON Structure:**
+
+```json
+{
+  "topic": "Java Streams API",
+  "questions": [
+    {
+      "question": "What is the Java Stream API and how does it differ from Collections?",
+      "answer": "The Java Stream API, introduced in Java 8, provides a functional programming approach to process sequences of elements..."
+    },
+    {
+      "question": "Explain the difference between intermediate and terminal operations in Streams.",
+      "answer": "Intermediate operations (filter, map, flatMap, distinct, sorted, peek, limit, skip) return a new Stream..."
+    }
+  ]
+}
+```
+
+**Jira Ticket Enrichment:**
+
+The ticket receives a formatted comment with:
+
+- Topic header
+- Numbered Q&A pairs
+- Total question count
+- Labels: `interview-content`, `ai-generated`
+
+### Dual-Mode Support
+
+Content-Creator supports both execution modes:
+
+- **GitHub Models API mode** (default): Direct API calls to GitHub Models with GPT-5
+- **GitHub Copilot CLI mode**: Uses local Copilot CLI for interactive development (set `USE_MODELS_API=false`)
+
+### Runner Class
+
+`com.ayerma.assistant.ContentCreatorRunner` - Can be run standalone or via workflow
+
+### Recommended Configuration
+
+For highest quality interview content (default configuration):
+
+```bash
+MODELS_MODEL=gpt-5
+USE_MODELS_API=true
+```

@@ -1,0 +1,222 @@
+name: Jira -> Content-Creator
+
+on:
+  workflow_dispatch:
+    inputs:
+      ticket_id:
+        description: "Jira issue key (e.g., PROJ-123)"
+        required: true
+        type: string
+      ticket_summary:
+        description: "Java topic for interview questions (optional, will fetch from Jira if not provided)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  run-content-creator:
+    runs-on: ubuntu-latest
+
+    env:
+      TARGET_REPO: ${{ vars.TARGET_REPO }}
+      TARGET_REF: ${{ vars.TARGET_REF || 'main' }}
+      TARGET_REPO_PATH: ${{ vars.TARGET_REPO_PATH || 'target-repo' }}
+      TARGET_REPO_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Build
+        run: mvn -q -DskipTests package
+
+      - name: Clone target repository
+        run: |
+          if [ -z "$TARGET_REPO" ]; then
+            echo "[ERROR] TARGET_REPO is required (format: owner/repo)"
+            exit 1
+          fi
+
+          if [ -n "$TARGET_REPO_TOKEN" ]; then
+            CLONE_URL="https://x-access-token:${TARGET_REPO_TOKEN}@github.com/${TARGET_REPO}.git"
+          else
+            CLONE_URL="https://github.com/${TARGET_REPO}.git"
+          fi
+
+          echo "[INFO] Cloning $TARGET_REPO@$TARGET_REF into $TARGET_REPO_PATH"
+          git clone --depth 1 --branch "$TARGET_REF" "$CLONE_URL" "$TARGET_REPO_PATH"
+
+          # Configure git with token for all operations
+          cd "$TARGET_REPO_PATH"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if [ -n "$TARGET_REPO_TOKEN" ]; then
+            # Update remote URL to use token for push operations
+            git remote set-url origin "https://x-access-token:${TARGET_REPO_TOKEN}@github.com/${TARGET_REPO}.git"
+            
+            # Configure git to use the token globally for this runner
+            git config --global credential.helper store
+            echo "https://x-access-token:${TARGET_REPO_TOKEN}@github.com" > ~/.git-credentials
+            
+            # Also set url insteadOf for https GitHub URLs
+            git config --global url."https://x-access-token:${TARGET_REPO_TOKEN}@github.com/".insteadOf "https://github.com/"
+          fi
+
+      - name: Install GitHub Copilot CLI
+        run: |
+          echo "Installing GitHub Copilot CLI..."
+          npm install -g @github/copilot
+
+          # Add npm bin to PATH
+          NPM_PREFIX=$(npm prefix -g)
+          echo "$NPM_PREFIX/bin" >> $GITHUB_PATH
+
+          echo "Copilot CLI installed successfully"
+
+      - name: Generate prompt
+        env:
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+
+          USE_MODELS_API: ${{ vars.USE_MODELS_API || 'true' }}
+
+          CONTENT_CREATOR_INSTRUCTIONS_PATH: instructions/platform/roles/content-creator-role.md
+          TECHNICAL_REQUIREMENTS_PATH: instructions/platform/technical/technical-requirements.md
+
+          JIRA_ISSUE_KEY: ${{ inputs.ticket_id }}
+          JIRA_ISSUE_SUMMARY: ${{ inputs.ticket_summary }}
+
+          # Always generate prompt first
+          OUTPUT_PROMPT_ONLY: true
+          CONTENT_CREATOR_PROMPT_OUTPUT_PATH: content-creator-prompt.txt
+        run: |
+          echo "Generating Content-Creator prompt..."
+          java -cp target/ai-assistant-2-automation-0.1.0-all.jar com.ayerma.assistant.ContentCreatorRunner
+
+      - name: Call GitHub Models API
+        if: ${{ vars.USE_MODELS_API == 'true' || vars.USE_MODELS_API == '' }}
+        env:
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+
+          MODELS_TOKEN: ${{ secrets.MODELS_TOKEN }}
+          MODELS_ENDPOINT: ${{ vars.MODELS_ENDPOINT }}
+          MODELS_MODEL: ${{ vars.MODELS_MODEL || 'gpt-5' }}
+
+          USE_MODELS_API: true
+          OUTPUT_PROMPT_ONLY: false
+          CONTENT_CREATOR_PROMPT_OUTPUT_PATH: content-creator-prompt.txt
+          CONTENT_CREATOR_OUTPUT_PATH: content-creator-output.json
+
+          JIRA_ISSUE_KEY: ${{ inputs.ticket_id }}
+          JIRA_ISSUE_SUMMARY: ${{ inputs.ticket_summary }}
+        run: |
+          echo "Calling GitHub Models API with GPT-5..."
+          java -cp target/ai-assistant-2-automation-0.1.0-all.jar com.ayerma.assistant.ContentCreatorRunner
+
+      - name: Enrich target repository with Q&A content using Copilot CLI
+        env:
+          GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+        run: |
+          echo "[INFO] Enriching target repository with interview Q&A content..."
+
+          # Read the generated Q&A content
+          TOPIC=$(jq -r '.topic' content-creator-output.json)
+          echo "[INFO] Topic: $TOPIC"
+
+          # Build prompt for Copilot CLI to create files in target repo
+          PROMPT="You are a technical content organizer. I have generated Java interview questions with answers for the topic: '$TOPIC'.
+
+          The Q&A content is in the file content-creator-output.json in JSON format with structure:
+          {
+            \"topic\": \"...\",
+            \"questions\": [{\"question\": \"...\", \"answer\": \"...\"}]
+          }
+
+          Your task:
+          1. Read the content-creator-output.json file
+          2. Create well-structured markdown files in the $TARGET_REPO_PATH repository
+          3. Organize the content logically (e.g., create a folder structure like 'interview-questions/java/<topic-name>.md')
+          4. Format each question-answer pair clearly with proper markdown formatting
+          5. Include a table of contents if there are many questions
+          6. Add any helpful metadata (topic, question count, etc.)
+
+          Create the files now in the repository at path: $TARGET_REPO_PATH
+          Make sure the content is well-formatted, professional, and easy to read."
+
+          echo "[INFO] Calling Copilot CLI to create files in target repository..."
+          cd "$TARGET_REPO_PATH"
+          copilot --allow-all-tools -p "$PROMPT"
+
+          echo "[INFO] Content enrichment completed"
+
+      - name: Commit and push changes to target repository
+        run: |
+          cd "$TARGET_REPO_PATH"
+
+          # Check if there are any changes
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "[INFO] No changes to commit"
+            exit 0
+          fi
+
+          # Stage all changes
+          git add .
+
+          # Get topic from JSON for commit message
+          TOPIC=$(jq -r '.topic' ../content-creator-output.json)
+
+          # Commit changes
+          git commit -m "Add interview questions: $TOPIC" -m "Generated from Jira ticket ${{ inputs.ticket_id }}" -m "Auto-generated by Content-Creator workflow"
+
+          # Push changes
+          echo "[INFO] Pushing changes to $TARGET_REPO@$TARGET_REF..."
+          git push origin "$TARGET_REF"
+
+          echo "[SUCCESS] Changes pushed successfully"
+
+      - name: Add Jira comment with repository link
+        env:
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          JIRA_ISSUE_KEY: ${{ inputs.ticket_id }}
+          CONTENT_CREATOR_OUTPUT_PATH: content-creator-output.json
+          ENRICH_JIRA_FROM_OUTPUT: true
+        run: |
+          echo "[INFO] Adding comment to Jira ticket with repository information..."
+
+          # Get the commit SHA and build repository link
+          cd "$TARGET_REPO_PATH"
+          COMMIT_SHA=$(git rev-parse HEAD)
+          REPO_URL="https://github.com/${TARGET_REPO}/tree/${TARGET_REF}"
+          COMMIT_URL="https://github.com/${TARGET_REPO}/commit/${COMMIT_SHA}"
+
+          cd ..
+
+          # Add standard Jira enrichment (Q&A comment + labels)
+          java -cp target/ai-assistant-2-automation-0.1.0-all.jar com.ayerma.assistant.ContentCreatorRunner
+
+          echo "[SUCCESS] Jira ticket enriched with Q&A content and repository links"
+
+      - name: Upload result
+        uses: actions/upload-artifact@v4
+        with:
+          name: content-creator-output
+          path: |
+            content-creator-prompt.txt
+            content-creator-output.json

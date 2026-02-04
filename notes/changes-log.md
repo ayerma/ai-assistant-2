@@ -1,5 +1,130 @@
 # Changes Log
 
+## February 4, 2026 - Milestone: Add Content-Creator with Target Repository Integration
+
+### Summary
+
+Added a comprehensive Content-Creator assistant that generates Java interview Q&A via GitHub Models API (GPT-5), then uses Copilot CLI to intelligently organize and commit the content to a target repository. The workflow clones the target repo, creates well-structured markdown files, commits changes, and enriches the Jira ticket with Q&A content.
+
+### Key Accomplishments
+
+- ✅ Created `ContentCreatorRunner.java` for generating interview Q&A from Jira ticket topics
+- ✅ Created `content-creator-role.md` defining Senior Java Developer role (15+ years experience)
+- ✅ Added Content-Creator environment variables to `Env.java` with helper methods
+- ✅ Created `.github/workflows/jira-content-creator.yml` workflow with full automation:
+  - Generates interview Q&A JSON via GitHub Models API with GPT-5
+  - Clones target repository (supports private repos)
+  - Uses Copilot CLI to create organized markdown files in target repo
+  - Commits and pushes changes to target repository
+  - Enriches Jira ticket with Q&A comment and labels
+- ✅ Updated README.md with comprehensive documentation and usage examples
+- ✅ Default model: GPT-5 for highest quality interview content
+- ✅ Supports OUTPUT_PROMPT_ONLY and ENRICH_JIRA_FROM_OUTPUT modes
+
+### Workflow Features
+
+**Content Generation Flow:**
+1. Fetch Jira ticket with Java topic (e.g., "Java Streams API")
+2. Call GitHub Models API with GPT-5 to generate 8-12 interview questions + answers
+3. Clone target repository
+4. Use Copilot CLI to read Q&A JSON and create well-structured markdown files
+5. Commit changes: "Add interview questions: {topic}"
+6. Push to target repository
+7. Add formatted Q&A comment to Jira ticket
+8. Label ticket: `interview-content`, `ai-generated`
+
+### Configuration
+
+**New environment variables:**
+- `CONTENT_CREATOR_INSTRUCTIONS_PATH` (default: `instructions/platform/roles/content-creator-role.md`)
+- `CONTENT_CREATOR_OUTPUT_PATH` (default: `content-creator-output.json`)
+- `CONTENT_CREATOR_PROMPT_OUTPUT_PATH` (default: `content-creator-prompt.txt`)
+- `ENRICH_JIRA_FROM_OUTPUT` (default: `false`)
+
+**Required for workflow:**
+- `TARGET_REPO` - Repository to enrich (format: `owner/repo`)
+- `TARGET_REF` (default: `main`) - Branch to commit to
+- `TARGET_REPO_PATH` (default: `target-repo`) - Local clone path
+- `TARGET_REPO_TOKEN` - GitHub token with write access (secret)
+- `MODELS_TOKEN` - For GPT-5 API calls (secret)
+- `COPILOT_GITHUB_TOKEN` - For Copilot CLI (secret)
+- `MODELS_MODEL` (default: `gpt-5`)
+
+### Output Schema
+
+```json
+{
+  "topic": "string",
+  "questions": [
+    {
+      "question": "string",
+      "answer": "string"
+    }
+  ]
+}
+```
+
+### Integration
+
+- Follows established patterns from Tech Assistant, BA Assistant, and Content-Splitter
+- Uses same target repository pattern as Tech Assistant for consistency
+- Leverages Copilot CLI's intelligence for content organization and markdown creation
+- Automated git operations with proper authentication and commit messages
+
+---
+
+## February 4, 2026 - Add Content-Creator Assistant (Initial Version)
+
+### Summary
+
+Added a new Content-Creator assistant that generates comprehensive Java interview questions with detailed answers based on a topic from a Jira ticket. The assistant acts as a senior Java developer generating 8-12 common interview questions and enriches the parent ticket with formatted Q&A content.
+
+### Key Accomplishments
+
+- ✅ Created `ContentCreatorRunner.java` with dual-mode support (GitHub Models API and Copilot CLI)
+- ✅ Implemented Jira ticket enrichment by posting formatted Q&A content as comments
+- ✅ Created `content-creator-role.md` defining Senior Java Developer role with interview question generation instructions
+- ✅ Added Content-Creator environment variables to `Env.java` with helper methods
+- ✅ Supports `OUTPUT_PROMPT_ONLY` mode for CLI workflow integration
+- ✅ Supports `ENRICH_JIRA_FROM_OUTPUT` mode for enriching tickets from existing JSON output
+- ✅ Updated README.md with comprehensive Content-Creator documentation, usage examples, and dual-mode configuration
+- ✅ Automatically labels enriched tickets with `interview-content` and `ai-generated`
+
+### Configuration
+
+- New environment variables:
+  - `CONTENT_CREATOR_INSTRUCTIONS_PATH` (default: `instructions/platform/roles/content-creator-role.md`)
+  - `CONTENT_CREATOR_OUTPUT_PATH` (default: `content-creator-output.json`)
+  - `CONTENT_CREATOR_PROMPT_OUTPUT_PATH` (default: `content-creator-prompt.txt`)
+  - `ENRICH_JIRA_FROM_OUTPUT` (default: `false`)
+- Reuses existing: `USE_MODELS_API`, `MODELS_MODEL`, `COPILOT_CLI_COMMAND`, `OUTPUT_PROMPT_ONLY`, Jira secrets
+- Default model: `MODELS_MODEL=gpt-5` for highest quality interview content
+
+### Output Schema
+
+```json
+{
+  "topic": "string",
+  "questions": [
+    {
+      "question": "string",
+      "answer": "string"
+    }
+  ]
+}
+```
+
+### Features
+
+- Dual-mode execution: GitHub Models API (default) or Copilot CLI
+- Fetches Jira ticket summary as topic, or uses provided `JIRA_ISSUE_SUMMARY`
+- Generates 8-12 most common interview questions with comprehensive, senior-level answers
+- Enriches parent Jira ticket with formatted Q&A comment
+- Adds `interview-content` and `ai-generated` labels to enriched tickets
+- Supports standalone execution or workflow integration
+
+---
+
 ## February 4, 2026 - Add Content-Spitter Assistant
 
 ### Summary

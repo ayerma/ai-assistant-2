@@ -32,4 +32,17 @@ public final class Env {
     public static String contentSplitterPromptOutputPath() {
         return optional("CONTENT_SPLITTER_PROMPT_OUTPUT_PATH", "content-splitter-prompt.txt");
     }
+
+    // Content-Creator Assistant environment variables
+    public static String contentCreatorInstructionsPath() {
+        return optional("CONTENT_CREATOR_INSTRUCTIONS_PATH", "instructions/platform/roles/content-creator-role.md");
+    }
+
+    public static String contentCreatorOutputPath() {
+        return optional("CONTENT_CREATOR_OUTPUT_PATH", "content-creator-output.json");
+    }
+
+    public static String contentCreatorPromptOutputPath() {
+        return optional("CONTENT_CREATOR_PROMPT_OUTPUT_PATH", "content-creator-prompt.txt");
+    }
 }

@@ -13,7 +13,6 @@
 - Layout: split-screen UI
   - Left sidebar: Topics/Questions
   - Center: Answer display
-- Key feature: Each answer supports level toggles (Junior, Middle, Senior, Tricky). Selecting a toggle updates the displayed answer content to match depth/complexity.
 
 ## Implementation Preferences
 
