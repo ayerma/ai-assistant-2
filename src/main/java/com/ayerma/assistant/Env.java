@@ -19,4 +19,17 @@ public final class Env {
         }
         return value;
     }
+
+    // Content-Spitter Assistant environment variables
+    public static String contentSpitterInstructionsPath() {
+        return optional("CONTENT_SPITTER_INSTRUCTIONS_PATH", "instructions/platform/roles/content-spitter-role.md");
+    }
+
+    public static String contentSpitterOutputPath() {
+        return optional("CONTENT_SPITTER_OUTPUT_PATH", "content-spitter-output.json");
+    }
+
+    public static String contentSpitterPromptOutputPath() {
+        return optional("CONTENT_SPITTER_PROMPT_OUTPUT_PATH", "content-spitter-prompt.txt");
+    }
 }

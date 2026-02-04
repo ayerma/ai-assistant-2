@@ -1,5 +1,47 @@
 # Changes Log
 
+## February 4, 2026 - Add Content-Spitter Assistant
+
+### Summary
+
+Added a new Content-Spitter assistant that analyzes content-focused Jira tickets and automatically breaks them down into logical subtopic tasks, creating child tasks in Jira with only the "Content-breaker" label.
+
+### Key Accomplishments
+
+- ✅ Created `ContentSpitterRunner.java` following the established BA/Tech/Troubleshooter pattern
+- ✅ Added `createIssueWithParentAndLabels()` method to `JiraClient.java` for custom label support
+- ✅ Refactored `createIssueWithParent()` to use new method with "DEV-AI" label by default
+- ✅ Created `content-spitter-role.md` with Content Analyst role definition and subtopic breakdown instructions
+- ✅ Added Content-Spitter environment variables to `Env.java` with helper methods
+- ✅ Created `.github/workflows/jira-content-spitter.yml` workflow supporting both API and CLI modes
+- ✅ Updated README.md with comprehensive Content-Spitter documentation and usage examples
+- ✅ All created subtopic tasks are labeled with "Content-breaker" only (no DEV-AI label)
+
+### Configuration
+
+- New environment variables:
+  - `CONTENT_SPITTER_INSTRUCTIONS_PATH` (default: `instructions/platform/roles/content-spitter-role.md`)
+  - `CONTENT_SPITTER_OUTPUT_PATH` (default: `content-spitter-output.json`)
+  - `CONTENT_SPITTER_PROMPT_OUTPUT_PATH` (default: `content-spitter-prompt.txt`)
+- Reuses existing: `JIRA_TASK_ISSUE_TYPE`, `USE_MODELS_API`, Jira secrets
+
+### Output Schema
+
+```json
+{
+  "content_area": "string",
+  "summary": "string",
+  "subtopics": [
+    {
+      "title": "string",
+      "description": "string"
+    }
+  ]
+}
+```
+
+---
+
 ## February 3, 2026 - Milestone: Enhanced Tech Flow with Automerge and Validation
 
 ### Summary

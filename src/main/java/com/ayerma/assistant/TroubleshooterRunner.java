@@ -26,7 +26,8 @@ public final class TroubleshooterRunner {
 
         String outputPath = Env.optional("TROUBLESHOOTER_OUTPUT_PATH", "troubleshooter-output.json");
 
-        // Check if we should create Jira tickets from existing output file (CLI workflow post-processing)
+        // Check if we should create Jira tickets from existing output file (CLI
+        // workflow post-processing)
         boolean createFromOutput = Env.optional("CREATE_JIRA_FROM_OUTPUT", "false").equalsIgnoreCase("true");
         if (createFromOutput) {
             System.out.println("[INFO] CREATE_JIRA_FROM_OUTPUT mode - reading from " + outputPath);
@@ -111,7 +112,8 @@ public final class TroubleshooterRunner {
         String instructions = Files.readString(Path.of(instructionsPath), StandardCharsets.UTF_8);
         System.out.println("[SUCCESS] Troubleshooter instructions loaded (" + instructions.length() + " chars)");
 
-        String result = instructions + "\n\nIMPORTANT: Follow the instructions exactly. Return ONLY the strict JSON object.";
+        String result = instructions
+                + "\n\nIMPORTANT: Follow the instructions exactly. Return ONLY the strict JSON object.";
         System.out.println("[SUCCESS] System prompt finalized (total length: " + result.length() + " chars)");
         return result;
     }
@@ -178,7 +180,8 @@ public final class TroubleshooterRunner {
 
                         prompt.append("---\n\n");
                     } catch (Exception e) {
-                        System.out.println("[WARN] Could not fetch related issue " + relatedKey + ": " + e.getMessage());
+                        System.out
+                                .println("[WARN] Could not fetch related issue " + relatedKey + ": " + e.getMessage());
                     }
                 }
             }

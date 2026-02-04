@@ -18,6 +18,7 @@ Workflows:
 
 - `.github/workflows/jira-ba-assistant.yml`
 - `.github/workflows/jira-tech-assistant.yml`
+- `.github/workflows/jira-content-spitter.yml`
 
 Add these **GitHub repository secrets**:
 
@@ -92,3 +93,75 @@ The JSON output includes:
 - Each question ticket includes context, options, and reasoning for why human input is required
 
 See `instructions/platform/roles/ba-role.md` for detailed examples and guidelines.
+
+## Content-Spitter Assistant
+
+The Content-Spitter assistant analyzes content-focused Jira tickets and automatically breaks them down into logical subtopics, creating child tasks for each subtopic.
+
+### Purpose
+
+- Analyzes content requirements from a Jira ticket
+- Identifies logical subtopics or content areas
+- Creates separate Jira tasks for each subtopic
+- Each created task is linked to the parent ticket and labeled with **"Content-breaker"**
+
+### How It Works
+
+1. Takes a Jira ticket describing content needs (e.g., documentation, marketing content, guides)
+2. AI analyzes the content area and breaks it into focused subtopics
+3. For each subtopic, a child Task is created in Jira with:
+   - Clear title describing the subtopic
+   - Detailed description of what should be covered
+   - Linked to the original parent ticket
+   - Tagged with `Content-breaker` label (only label, no `DEV-AI`)
+
+### Usage
+
+**Manual Trigger (GitHub Actions):**
+
+```bash
+# Navigate to Actions > Jira -> Content-Spitter
+# Click "Run workflow"
+# Enter ticket_id (e.g., PROJ-123)
+# Optionally provide ticket_summary and ticket_description
+```
+
+**Environment Variables:**
+
+- `CONTENT_SPITTER_INSTRUCTIONS_PATH` (default: `instructions/platform/roles/content-spitter-role.md`)
+- `CONTENT_SPITTER_OUTPUT_PATH` (default: `content-spitter-output.json`)
+- `CONTENT_SPITTER_PROMPT_OUTPUT_PATH` (default: `content-spitter-prompt.txt`)
+- `JIRA_TASK_ISSUE_TYPE` (default: `Task`) - used for created subtopic tasks
+
+**Output Files:**
+
+- `content-spitter-prompt.txt` - Generated prompt combining role instructions and ticket content
+- `content-spitter-output.json` - AI-generated JSON with subtopics breakdown
+
+### Example
+
+**Input Ticket:**
+```
+Title: Create developer documentation for REST API
+Description: Need comprehensive docs covering authentication, endpoints, error handling, and examples
+```
+
+**Output (Jira Tasks Created):**
+- `PROJ-124`: Getting Started and Authentication [Content-breaker]
+- `PROJ-125`: Endpoint Reference - User Management [Content-breaker]
+- `PROJ-126`: Endpoint Reference - Data Operations [Content-breaker]
+- `PROJ-127`: Error Handling and Status Codes [Content-breaker]
+- `PROJ-128`: Code Examples and SDKs [Content-breaker]
+
+All tasks are linked to `PROJ-123` as child tasks.
+
+### Runner Class
+
+`com.ayerma.assistant.ContentSpitterRunner` - Can be run standalone or via workflow
+
+### Dual-Mode Support
+
+Like other assistants, Content-Spitter supports both:
+- **GitHub Models API mode** (default): Direct API calls to AI model
+- **GitHub Copilot CLI mode**: Uses local Copilot CLI (set `USE_MODELS_API=false`)
+

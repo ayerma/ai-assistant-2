@@ -1,0 +1,154 @@
+name: Jira -> Content-Spitter
+
+on:
+  workflow_dispatch:
+    inputs:
+      ticket_id:
+        description: "Jira issue key (e.g., PROJ-123)"
+        required: true
+        type: string
+      ticket_summary:
+        description: "Jira issue summary (optional, will fetch if not provided)"
+        required: false
+        type: string
+      ticket_description:
+        description: "Jira issue description (optional, will fetch if not provided)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  run-content-spitter:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Build
+        run: mvn -q -DskipTests package
+
+      - name: Install GitHub Copilot CLI
+        if: ${{ vars.USE_MODELS_API == 'false' }}
+        run: |
+          echo "Installing GitHub Copilot CLI..."
+          npm install -g @github/copilot
+
+          # Add npm bin to PATH
+          NPM_PREFIX=$(npm prefix -g)
+          echo "$NPM_PREFIX/bin" >> $GITHUB_PATH
+
+          echo "Copilot CLI installed successfully"
+
+      - name: Generate prompt
+        env:
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+
+          USE_MODELS_API: ${{ vars.USE_MODELS_API || 'true' }}
+
+          CONTENT_SPITTER_INSTRUCTIONS_PATH: instructions/platform/roles/content-spitter-role.md
+          TECHNICAL_REQUIREMENTS_PATH: instructions/platform/technical/technical-requirements.md
+
+          JIRA_ISSUE_KEY: ${{ inputs.ticket_id }}
+          JIRA_ISSUE_SUMMARY: ${{ inputs.ticket_summary }}
+          JIRA_ISSUE_DESCRIPTION: ${{ inputs.ticket_description }}
+
+          # Always generate prompt first
+          OUTPUT_PROMPT_ONLY: true
+          CONTENT_SPITTER_PROMPT_OUTPUT_PATH: content-spitter-prompt.txt
+        run: |
+          echo "Generating Content-Spitter prompt..."
+          java -cp target/ai-assistant-2-automation-0.1.0-all.jar com.ayerma.assistant.ContentSpitterRunner
+
+      - name: Call GitHub Models API
+        if: ${{ vars.USE_MODELS_API == 'true' || vars.USE_MODELS_API == '' }}
+        env:
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+
+          MODELS_TOKEN: ${{ secrets.MODELS_TOKEN }}
+          MODELS_ENDPOINT: ${{ vars.MODELS_ENDPOINT }}
+          MODELS_MODEL: ${{ vars.MODELS_MODEL }}
+
+          USE_MODELS_API: true
+          OUTPUT_PROMPT_ONLY: false
+          CONTENT_SPITTER_PROMPT_OUTPUT_PATH: content-spitter-prompt.txt
+          CONTENT_SPITTER_OUTPUT_PATH: content-spitter-output.json
+
+          JIRA_TASK_ISSUE_TYPE: ${{ vars.JIRA_TASK_ISSUE_TYPE || 'Task' }}
+
+          JIRA_ISSUE_KEY: ${{ inputs.ticket_id }}
+          JIRA_ISSUE_SUMMARY: ${{ inputs.ticket_summary }}
+          JIRA_ISSUE_DESCRIPTION: ${{ inputs.ticket_description }}
+        run: |
+          echo "Calling GitHub Models API..."
+          java -cp target/ai-assistant-2-automation-0.1.0-all.jar com.ayerma.assistant.ContentSpitterRunner
+
+      - name: Call Copilot CLI
+        if: ${{ vars.USE_MODELS_API == 'false' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+        run: |
+          echo "Calling Copilot CLI..."
+          copilot --allow-all-tools -p "$(cat content-spitter-prompt.txt)" > content-spitter-output-raw.txt
+
+          echo "Extracting JSON from output..."
+          python3 -c "
+          import re
+          import json
+
+          with open('content-spitter-output-raw.txt', 'r') as f:
+              content = f.read()
+
+          # Try to find JSON block
+          json_match = re.search(r'\{.*\}', content, re.DOTALL)
+          if json_match:
+              json_str = json_match.group(0)
+              parsed = json.loads(json_str)
+              with open('content-spitter-output.json', 'w') as out:
+                  json.dump(parsed, out, indent=2)
+              print('[SUCCESS] Extracted and wrote JSON output')
+          else:
+              print('[ERROR] No JSON found in copilot output')
+              exit(1)
+          "
+
+      - name: Create Jira tickets from output
+        if: ${{ vars.USE_MODELS_API == 'false' }}
+        env:
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+
+          JIRA_TASK_ISSUE_TYPE: ${{ vars.JIRA_TASK_ISSUE_TYPE || 'Task' }}
+
+          JIRA_ISSUE_KEY: ${{ inputs.ticket_id }}
+
+          # Read from the extracted content-spitter-output.json
+          CONTENT_SPITTER_OUTPUT_PATH: content-spitter-output.json
+          CREATE_JIRA_FROM_OUTPUT: true
+        run: |
+          echo "Creating Jira tickets from content-spitter-output.json..."
+          java -cp target/ai-assistant-2-automation-0.1.0-all.jar com.ayerma.assistant.ContentSpitterRunner
+
+      - name: Upload result
+        uses: actions/upload-artifact@v4
+        with:
+          name: content-spitter-output
+          path: |
+            content-spitter-prompt.txt
+            content-spitter-output.json
