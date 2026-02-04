@@ -1,4 +1,4 @@
-name: Jira -> Content-Spitter
+name: Jira -> Content-Splitter
 
 on:
   workflow_dispatch:
@@ -20,7 +20,7 @@ permissions:
   contents: read
 
 jobs:
-  run-content-spitter:
+  run-content-splitter:
     runs-on: ubuntu-latest
 
     steps:
@@ -57,7 +57,7 @@ jobs:
 
           USE_MODELS_API: ${{ vars.USE_MODELS_API || 'true' }}
 
-          CONTENT_SPITTER_INSTRUCTIONS_PATH: instructions/platform/roles/content-spitter-role.md
+          CONTENT_SPLITTER_INSTRUCTIONS_PATH: instructions/platform/roles/content-splitter-role.md
           TECHNICAL_REQUIREMENTS_PATH: instructions/platform/technical/technical-requirements.md
 
           JIRA_ISSUE_KEY: ${{ inputs.ticket_id }}
@@ -66,10 +66,10 @@ jobs:
 
           # Always generate prompt first
           OUTPUT_PROMPT_ONLY: true
-          CONTENT_SPITTER_PROMPT_OUTPUT_PATH: content-spitter-prompt.txt
+          CONTENT_SPLITTER_PROMPT_OUTPUT_PATH: content-splitter-prompt.txt
         run: |
-          echo "Generating Content-Spitter prompt..."
-          java -cp target/ai-assistant-2-automation-0.1.0-all.jar com.ayerma.assistant.ContentSpitterRunner
+          echo "Generating Content-Splitter prompt..."
+          java -cp target/ai-assistant-2-automation-0.1.0-all.jar com.ayerma.assistant.ContentSplitterRunner
 
       - name: Call GitHub Models API
         if: ${{ vars.USE_MODELS_API == 'true' || vars.USE_MODELS_API == '' }}
@@ -84,8 +84,8 @@ jobs:
 
           USE_MODELS_API: true
           OUTPUT_PROMPT_ONLY: false
-          CONTENT_SPITTER_PROMPT_OUTPUT_PATH: content-spitter-prompt.txt
-          CONTENT_SPITTER_OUTPUT_PATH: content-spitter-output.json
+          CONTENT_SPLITTER_PROMPT_OUTPUT_PATH: content-splitter-prompt.txt
+          CONTENT_SPLITTER_OUTPUT_PATH: content-splitter-output.json
 
           JIRA_TASK_ISSUE_TYPE: ${{ vars.JIRA_TASK_ISSUE_TYPE || 'Task' }}
 
@@ -94,7 +94,7 @@ jobs:
           JIRA_ISSUE_DESCRIPTION: ${{ inputs.ticket_description }}
         run: |
           echo "Calling GitHub Models API..."
-          java -cp target/ai-assistant-2-automation-0.1.0-all.jar com.ayerma.assistant.ContentSpitterRunner
+          java -cp target/ai-assistant-2-automation-0.1.0-all.jar com.ayerma.assistant.ContentSplitterRunner
 
       - name: Call Copilot CLI
         if: ${{ vars.USE_MODELS_API == 'false' }}
@@ -104,14 +104,14 @@ jobs:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
         run: |
           echo "Calling Copilot CLI..."
-          copilot --allow-all-tools -p "$(cat content-spitter-prompt.txt)" > content-spitter-output-raw.txt
+          copilot --allow-all-tools -p "$(cat content-splitter-prompt.txt)" > content-splitter-output-raw.txt
 
           echo "Extracting JSON from output..."
           python3 -c "
           import re
           import json
 
-          with open('content-spitter-output-raw.txt', 'r') as f:
+          with open('content-splitter-output-raw.txt', 'r') as f:
               content = f.read()
 
           # Try to find JSON block
@@ -119,7 +119,7 @@ jobs:
           if json_match:
               json_str = json_match.group(0)
               parsed = json.loads(json_str)
-              with open('content-spitter-output.json', 'w') as out:
+              with open('content-splitter-output.json', 'w') as out:
                   json.dump(parsed, out, indent=2)
               print('[SUCCESS] Extracted and wrote JSON output')
           else:
@@ -138,17 +138,17 @@ jobs:
 
           JIRA_ISSUE_KEY: ${{ inputs.ticket_id }}
 
-          # Read from the extracted content-spitter-output.json
-          CONTENT_SPITTER_OUTPUT_PATH: content-spitter-output.json
+          # Read from the extracted content-splitter-output.json
+          CONTENT_SPLITTER_OUTPUT_PATH: content-splitter-output.json
           CREATE_JIRA_FROM_OUTPUT: true
         run: |
-          echo "Creating Jira tickets from content-spitter-output.json..."
-          java -cp target/ai-assistant-2-automation-0.1.0-all.jar com.ayerma.assistant.ContentSpitterRunner
+          echo "Creating Jira tickets from content-splitter-output.json..."
+          java -cp target/ai-assistant-2-automation-0.1.0-all.jar com.ayerma.assistant.ContentSplitterRunner
 
       - name: Upload result
         uses: actions/upload-artifact@v4
         with:
-          name: content-spitter-output
+          name: content-splitter-output
           path: |
-            content-spitter-prompt.txt
-            content-spitter-output.json
+            content-splitter-prompt.txt
+            content-splitter-output.json

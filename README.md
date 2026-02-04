@@ -18,7 +18,7 @@ Workflows:
 
 - `.github/workflows/jira-ba-assistant.yml`
 - `.github/workflows/jira-tech-assistant.yml`
-- `.github/workflows/jira-content-spitter.yml`
+- `.github/workflows/jira-content-splitter.yml`
 
 Add these **GitHub repository secrets**:
 
@@ -94,9 +94,9 @@ The JSON output includes:
 
 See `instructions/platform/roles/ba-role.md` for detailed examples and guidelines.
 
-## Content-Spitter Assistant
+## Content-Splitter Assistant
 
-The Content-Spitter assistant analyzes content-focused Jira tickets and automatically breaks them down into logical subtopics, creating child tasks for each subtopic.
+The Content-Splitter assistant analyzes content-focused Jira tickets and automatically breaks them down into logical subtopics, creating child tasks for each subtopic.
 
 ### Purpose
 
@@ -120,7 +120,7 @@ The Content-Spitter assistant analyzes content-focused Jira tickets and automati
 **Manual Trigger (GitHub Actions):**
 
 ```bash
-# Navigate to Actions > Jira -> Content-Spitter
+# Navigate to Actions > Jira -> Content-Splitter
 # Click "Run workflow"
 # Enter ticket_id (e.g., PROJ-123)
 # Optionally provide ticket_summary and ticket_description
@@ -128,15 +128,15 @@ The Content-Spitter assistant analyzes content-focused Jira tickets and automati
 
 **Environment Variables:**
 
-- `CONTENT_SPITTER_INSTRUCTIONS_PATH` (default: `instructions/platform/roles/content-spitter-role.md`)
-- `CONTENT_SPITTER_OUTPUT_PATH` (default: `content-spitter-output.json`)
-- `CONTENT_SPITTER_PROMPT_OUTPUT_PATH` (default: `content-spitter-prompt.txt`)
+- `CONTENT_SPLITTER_INSTRUCTIONS_PATH` (default: `instructions/platform/roles/content-splitter-role.md`)
+- `CONTENT_SPLITTER_OUTPUT_PATH` (default: `content-splitter-output.json`)
+- `CONTENT_SPLITTER_PROMPT_OUTPUT_PATH` (default: `content-splitter-prompt.txt`)
 - `JIRA_TASK_ISSUE_TYPE` (default: `Task`) - used for created subtopic tasks
 
 **Output Files:**
 
-- `content-spitter-prompt.txt` - Generated prompt combining role instructions and ticket content
-- `content-spitter-output.json` - AI-generated JSON with subtopics breakdown
+- `content-splitter-prompt.txt` - Generated prompt combining role instructions and ticket content
+- `content-splitter-output.json` - AI-generated JSON with subtopics breakdown
 
 ### Example
 
@@ -157,11 +157,11 @@ All tasks are linked to `PROJ-123` as child tasks.
 
 ### Runner Class
 
-`com.ayerma.assistant.ContentSpitterRunner` - Can be run standalone or via workflow
+`com.ayerma.assistant.ContentSplitterRunner` - Can be run standalone or via workflow
 
 ### Dual-Mode Support
 
-Like other assistants, Content-Spitter supports both:
+Like other assistants, Content-Splitter supports both:
 - **GitHub Models API mode** (default): Direct API calls to AI model
 - **GitHub Copilot CLI mode**: Uses local Copilot CLI (set `USE_MODELS_API=false`)
 

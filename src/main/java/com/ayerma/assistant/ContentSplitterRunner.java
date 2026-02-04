@@ -10,9 +10,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-public final class ContentSpitterRunner {
+public final class ContentSplitterRunner {
     public static void main(String[] args) throws Exception {
-        System.out.println("[INFO] Starting Content-Spitter Runner...");
+        System.out.println("[INFO] Starting Content-Splitter Runner...");
 
         String issueKey = args.length > 0 ? args[0] : Env.required("JIRA_ISSUE_KEY");
         System.out.println("[INFO] Processing Jira issue: " + issueKey);
@@ -24,17 +24,17 @@ public final class ContentSpitterRunner {
         HttpJson jiraHttp = new HttpJson();
         JiraClient jiraClient = new JiraClient(jiraHttp, jiraBaseUrl, jiraEmail, jiraApiToken);
 
-        String outputPath = Env.contentSpitterOutputPath();
+        String outputPath = Env.contentSplitterOutputPath();
 
         // Check if we should create Jira tickets from existing output file (CLI workflow post-processing)
         boolean createFromOutput = Env.optional("CREATE_JIRA_FROM_OUTPUT", "false").equalsIgnoreCase("true");
         if (createFromOutput) {
             System.out.println("[INFO] CREATE_JIRA_FROM_OUTPUT mode - reading from " + outputPath);
 
-            // Read and parse the Content-Spitter output JSON file
+            // Read and parse the Content-Splitter output JSON file
             String outputContent = Files.readString(Path.of(outputPath), StandardCharsets.UTF_8);
             JsonNode parsed = HttpJson.MAPPER.readTree(outputContent);
-            System.out.println("[INFO] Successfully loaded Content-Spitter output from file");
+            System.out.println("[INFO] Successfully loaded Content-Splitter output from file");
 
             // Create Jira tickets from the parsed output
             createJiraTicketsFromOutput(jiraClient, issueKey, parsed);
@@ -56,7 +56,7 @@ public final class ContentSpitterRunner {
             System.out.println("[INFO] Using CLI command: " + cliCommand);
         }
 
-        String instructionsPath = Env.contentSpitterInstructionsPath();
+        String instructionsPath = Env.contentSplitterInstructionsPath();
         String technicalReqPath = Env.optional("TECHNICAL_REQUIREMENTS_PATH",
                 "instructions/platform/technical/technical-requirements.md");
 
@@ -82,7 +82,7 @@ public final class ContentSpitterRunner {
         }
 
         // Always write the prompt to file first
-        String promptOutputPath = Env.contentSpitterPromptOutputPath();
+        String promptOutputPath = Env.contentSplitterPromptOutputPath();
         String combinedPrompt = systemPrompt + "\n\n" + userPrompt;
         Files.writeString(Path.of(promptOutputPath), combinedPrompt, StandardCharsets.UTF_8);
         System.out.println("[INFO] Wrote combined prompt to: " + promptOutputPath);
@@ -96,7 +96,7 @@ public final class ContentSpitterRunner {
             return;
         }
 
-        System.out.println("[INFO] Calling AI to generate Content-Spitter output...");
+        System.out.println("[INFO] Calling AI to generate Content-Splitter output...");
 
         // Create appropriate client based on flag (API mode only reaches here)
         BaAssistantClient client;
@@ -120,7 +120,7 @@ public final class ContentSpitterRunner {
 
         Files.writeString(Path.of(outputPath),
                 HttpJson.MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(parsed), StandardCharsets.UTF_8);
-        System.out.println("[SUCCESS] Wrote Content-Spitter output to: " + outputPath);
+        System.out.println("[SUCCESS] Wrote Content-Splitter output to: " + outputPath);
 
         // Create Jira tickets from the parsed output
         createJiraTicketsFromOutput(jiraClient, issueKey, parsed);
@@ -128,7 +128,7 @@ public final class ContentSpitterRunner {
 
     private static void createJiraTicketsFromOutput(JiraClient jiraClient, String issueKey, JsonNode parsed)
             throws Exception {
-        System.out.println("[INFO] Creating Jira child tasks from Content-Spitter output...");
+        System.out.println("[INFO] Creating Jira child tasks from Content-Splitter output...");
 
         // Extract project key from issue key (e.g., "IN-1" -> "IN")
         String projectKey = issueKey.contains("-") ? issueKey.substring(0, issueKey.indexOf('-')) : issueKey;
@@ -139,7 +139,7 @@ public final class ContentSpitterRunner {
 
         JsonNode subtopics = parsed.get("subtopics");
         if (subtopics == null || !subtopics.isArray() || subtopics.isEmpty()) {
-            System.out.println("[WARN] No subtopics found in Content-Spitter output - skipping Jira creation");
+            System.out.println("[WARN] No subtopics found in Content-Splitter output - skipping Jira creation");
             return;
         }
 
@@ -167,11 +167,11 @@ public final class ContentSpitterRunner {
     private static String loadSystemPrompt(String instructionsPath, String technicalReqPath) throws IOException {
         StringBuilder systemPrompt = new StringBuilder();
 
-        // Load Content-Spitter role instructions
-        System.out.println("[INFO] Loading Content-Spitter role instructions from: " + instructionsPath);
+        // Load Content-Splitter role instructions
+        System.out.println("[INFO] Loading Content-Splitter role instructions from: " + instructionsPath);
         String csInstructions = Files.readString(Path.of(instructionsPath), StandardCharsets.UTF_8);
         systemPrompt.append(csInstructions);
-        System.out.println("[SUCCESS] Content-Spitter instructions loaded (" + csInstructions.length() + " chars)");
+        System.out.println("[SUCCESS] Content-Splitter instructions loaded (" + csInstructions.length() + " chars)");
 
         // Load technical requirements if file exists
         Path techPath = Path.of(technicalReqPath);
