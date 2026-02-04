@@ -105,7 +105,6 @@ jobs:
           java -cp target/ai-assistant-2-automation-0.1.0-all.jar com.ayerma.assistant.ContentCreatorRunner
 
       - name: Call GitHub Models API
-        if: ${{ vars.USE_MODELS_API == 'true' || vars.USE_MODELS_API == '' }}
         env:
           JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
           JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
