@@ -195,7 +195,6 @@ The Content-Creator now operates as a **two-stage pipeline**:
 - **Creates a Pull Request** with the generated content in the target repository
 - Auto-merges PR if `AUTOMERGE=true` (requires appropriate permissions)
 - Enriches the Jira ticket with PR link and formatted Q&A content
-- Labels the ticket with `interview-content` and `ai-generated`
 - Outputs: `content-creator-output.json`
 
 ### Purpose
@@ -354,7 +353,6 @@ The ticket receives a formatted comment with:
 - Topic header
 - Numbered Q&A pairs (15 questions total)
 - Total question count
-- Labels: `interview-content`, `ai-generated`
 
 ### Key Features
 

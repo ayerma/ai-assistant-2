@@ -200,8 +200,11 @@ public final class ContentCreatorRunner {
             String assistantOutput = client.runBaAssistant(systemPrompt, userPrompt);
             System.out.println("[DEBUG] Received answer for question " + questionNumber);
 
+            // Extract JSON from markdown code blocks if present
+            String cleanedOutput = extractJsonFromMarkdown(assistantOutput);
+            
             // Parse the answer JSON
-            JsonNode answerData = HttpJson.MAPPER.readTree(assistantOutput);
+            JsonNode answerData = HttpJson.MAPPER.readTree(cleanedOutput);
             answeredQuestions.add(answerData);
 
             questionNumber++;
@@ -417,10 +420,6 @@ public final class ContentCreatorRunner {
         // Add comment to Jira ticket
         jiraClient.addComment(issueKey, comment.toString());
         System.out.println("[SUCCESS] Added " + questions.size() + " interview questions to Jira ticket " + issueKey);
-
-        // Add label to indicate content has been generated
-        jiraClient.addLabels(issueKey, "interview-content", "ai-generated");
-        System.out.println("[SUCCESS] Added labels to Jira ticket");
     }
 
     private static String textAt(JsonNode node, String path) {
@@ -429,5 +428,41 @@ public final class ContentCreatorRunner {
             return "";
         }
         return result.asText("");
+    }
+
+    /**
+     * Extract JSON from markdown code blocks.
+     * Handles both ```json ... ``` and ``` ... ``` formats.
+     */
+    private static String extractJsonFromMarkdown(String output) {
+        if (output == null || output.isEmpty()) {
+            return output;
+        }
+
+        String trimmed = output.trim();
+        
+        // Check if output is wrapped in markdown code blocks
+        if (trimmed.startsWith("```")) {
+            // Find the first newline after opening fence
+            int startIndex = trimmed.indexOf('\n');
+            if (startIndex == -1) {
+                // No newline found, try without fence
+                startIndex = 3; // Skip ```
+                if (trimmed.startsWith("```json")) {
+                    startIndex = 7; // Skip ```json
+                }
+            } else {
+                startIndex++; // Skip the newline
+            }
+            
+            // Find the closing fence
+            int endIndex = trimmed.lastIndexOf("```");
+            if (endIndex > startIndex) {
+                return trimmed.substring(startIndex, endIndex).trim();
+            }
+        }
+        
+        // No markdown wrapping, return as-is
+        return trimmed;
     }
 }
