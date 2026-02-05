@@ -88,7 +88,9 @@ jobs:
       - name: Prepare questions JSON
         run: |
           echo "[INFO] Writing questions JSON to file..."
-          echo '${{ inputs.questions_json }}' > content-creator-questions.json
+          cat > content-creator-questions.json << 'EOF'
+          ${{ inputs.questions_json }}
+          EOF
 
           # Validate JSON
           jq . content-creator-questions.json > /dev/null
