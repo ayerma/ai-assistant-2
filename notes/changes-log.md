@@ -18,12 +18,14 @@ Enhanced the Content-Creator answers flow with mandatory validation of the `ADDI
 ### Validation Behavior
 
 **Pre-execution Checks:**
+
 1. Validates `ADDING_CONTENT.md` exists at `{TARGET_REPO_PATH}/public/data/ADDING_CONTENT.md`
 2. Verifies file is readable
 3. If validation fails → displays error messages and throws `IllegalStateException`
 4. If validation succeeds → loads content and enriches AI prompt
 
 **Error Messages:**
+
 - `[ERROR] ADDING_CONTENT.md file not found at: {path}`
 - `[ERROR] This file contains instructions for properly formatting questions.`
 - `[ERROR] Please ensure the target repository is checked out to: {path}`
@@ -31,10 +33,12 @@ Enhanced the Content-Creator answers flow with mandatory validation of the `ADDI
 ### Configuration
 
 **New environment variables:**
+
 - `TARGET_REPO_PATH` (default: `target-repo`) - Location of target repository
 - `CONTENT_INSTRUCTIONS_PATH` (default: `instructions/platform/technical/content-instructions.md`)
 
 **Updated files:**
+
 - `ContentCreatorRunner.java` - Added validation logic in `runAnswersMode()`
 - `Env.java` - Added helper methods for new configuration
 - `instructions/platform/technical/content-instructions.md` - Created comprehensive guidelines
@@ -63,6 +67,7 @@ Added a comprehensive Content-Creator assistant that generates Java interview Q&
 ### Workflow Features
 
 **Content Generation Flow:**
+
 1. Fetch Jira ticket with Java topic (e.g., "Java Streams API")
 2. Call GitHub Models API with GPT-5 to generate 8-12 interview questions + answers
 3. Clone target repository
@@ -75,12 +80,14 @@ Added a comprehensive Content-Creator assistant that generates Java interview Q&
 ### Configuration
 
 **New environment variables:**
+
 - `CONTENT_CREATOR_INSTRUCTIONS_PATH` (default: `instructions/platform/roles/content-creator-role.md`)
 - `CONTENT_CREATOR_OUTPUT_PATH` (default: `content-creator-output.json`)
 - `CONTENT_CREATOR_PROMPT_OUTPUT_PATH` (default: `content-creator-prompt.txt`)
 - `ENRICH_JIRA_FROM_OUTPUT` (default: `false`)
 
 **Required for workflow:**
+
 - `TARGET_REPO` - Repository to enrich (format: `owner/repo`)
 - `TARGET_REF` (default: `main`) - Branch to commit to
 - `TARGET_REPO_PATH` (default: `target-repo`) - Local clone path

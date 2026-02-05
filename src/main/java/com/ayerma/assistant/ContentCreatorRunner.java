@@ -123,7 +123,7 @@ public final class ContentCreatorRunner {
         // Validate ADDING_CONTENT.md file exists in target repository
         String targetRepoPath = Env.targetRepoPath();
         Path addingContentPath = Path.of(targetRepoPath, "public", "data", "ADDING_CONTENT.md");
-        
+
         System.out.println("[INFO] Validating ADDING_CONTENT.md at: " + addingContentPath);
         if (!Files.exists(addingContentPath)) {
             System.err.println("[ERROR] ADDING_CONTENT.md file not found at: " + addingContentPath);
@@ -131,12 +131,12 @@ public final class ContentCreatorRunner {
             System.err.println("[ERROR] Please ensure the target repository is checked out to: " + targetRepoPath);
             throw new IllegalStateException("Required file ADDING_CONTENT.md not found at " + addingContentPath);
         }
-        
+
         if (!Files.isReadable(addingContentPath)) {
             System.err.println("[ERROR] ADDING_CONTENT.md file exists but cannot be read: " + addingContentPath);
             throw new IllegalStateException("Cannot read required file: " + addingContentPath);
         }
-        
+
         System.out.println("[SUCCESS] ADDING_CONTENT.md file validated successfully");
         String addingContentGuidelines = Files.readString(addingContentPath, StandardCharsets.UTF_8);
 

@@ -32,9 +32,10 @@ Optional **GitHub repository variables**:
 - `MODELS_ENDPOINT` (default: `https://models.inference.ai.azure.com`)
 - `MODELS_MODEL` (default: `gpt-4o-mini`)
 - `DEV_INSTRUCTIONS_PATH` (default: `instructions/platform/roles/dev-role.md`)
-- `TARGET_REPO` (format: `owner/repo`, required for Tech Assistant)
+- `TARGET_REPO` (format: `owner/repo`, required for Tech Assistant and Content-Creator)
 - `TARGET_REF` (default: `main`)
 - `TARGET_REPO_PATH` (default: `target-repo`)
+- `AUTOMERGE` (default: `false`) - Auto-merge PRs after creation (Tech Assistant & Content-Creator)
 - `JIRA_STORY_ISSUE_TYPE` (default: `Story`)
 - `JIRA_TASK_ISSUE_TYPE` (default: `Task`)
 - `JIRA_QUESTION_ISSUE_TYPE` (default: `Sub-task`)
@@ -172,63 +173,138 @@ Like other assistants, Content-Splitter supports both:
 
 The Content-Creator assistant generates comprehensive Java interview questions with detailed answers based on a given topic from a Jira ticket.
 
-### Purpose
+### Two-Stage Workflow
+
+The Content-Creator now operates as a **two-stage pipeline**:
+
+#### Stage 1: Question Generation (jira-content-creator.yml)
 
 - Takes a Jira ticket with a Java topic as the summary/title
-- Generates 8-12 most common interview questions for that topic
-- Provides comprehensive, senior-level answers for each question
-- Enriches the parent Jira ticket by adding formatted Q&A content as a comment
+- Generates exactly **15 interview questions** ordered by gradually increasing difficulty
+- Includes: most popular questions + underrated questions + questions suitable for experienced professionals
+- Always uses GitHub Models API for consistent, high-quality question generation
+- Outputs: `content-creator-questions.json`
+- Automatically triggers Stage 2
+
+#### Stage 2: Question Answering (jira-answer.yml)
+
+- Can be triggered automatically by Stage 1 OR manually/externally with a `questions_json` input
+- Answers each question individually using either GitHub Models API or Copilot CLI (based on `USE_MODELS_API`)
+- Uses Java specialist guidance from `instructions/platform/technical/java-specialist.md`
+- Provides comprehensive, senior-level answers (3-15 sentences with inline code examples)
+- **Creates a Pull Request** with the generated content in the target repository
+- Auto-merges PR if `AUTOMERGE=true` (requires appropriate permissions)
+- Enriches the Jira ticket with PR link and formatted Q&A content
 - Labels the ticket with `interview-content` and `ai-generated`
+- Outputs: `content-creator-output.json`
+
+### Purpose
+
+- Generate high-quality Java interview content for educational/training purposes
+- Create structured Q&A pairs with professional-level depth
+- Automatically organize content into a target repository
+- Track content generation via Jira tickets
 
 ### How It Works
 
-1. Takes a Jira ticket where the summary/title represents a Java topic (e.g., "Java Streams API", "Java Concurrency")
-2. AI acts as a senior Java developer with 15+ years experience
-3. Generates the most frequently asked interview questions for that topic
-4. Provides detailed, production-ready answers with examples and best practices
-5. Adds formatted Q&A content to the Jira ticket as a comment
+**End-to-End Flow:**
+
+1. Trigger Stage 1 with a Jira ticket (e.g., "Java Streams API")
+2. Stage 1 generates 15 questions using GitHub Models API
+3. Stage 1 automatically triggers Stage 2, passing the questions JSON
+4. Stage 2 answers each question using the configured AI client (Models/CLI)
+5. Stage 2 creates a new branch and commits markdown files in the target repository
+6. Stage 2 creates a Pull Request with the content
+7. If `AUTOMERGE=true`, the PR is automatically merged
+8. Stage 2 enriches the Jira ticket with PR link and formatted Q&A content
+
+**External Triggering:**
+
+You can also trigger Stage 2 (jira-answer.yml) independently by providing your own `questions_json`:
+
+```json
+{
+  "topic": "Custom Topic",
+  "questions": ["Question 1", "Question 2", ...]
+}
+```
 
 ### Usage
 
 **Manual Trigger (GitHub Actions):**
 
 ```bash
-# Navigate to Actions > Jira -> Content-Creator
+# Stage 1: Generate Questions
+# Navigate to Actions > Jira -> Content-Creator (Questions)
 # Click "Run workflow"
 # Enter ticket_id (e.g., PROJ-123)
 # Optionally provide ticket_summary (topic name)
+# This automatically triggers Stage 2
+
+# Stage 2: Answer Questions (Manual/External Trigger)
+# Navigate to Actions > Jira -> Answer Questions
+# Click "Run workflow"
+# Enter ticket_id and questions_json (see format above)
 ```
 
 **Command-Line Execution:**
 
 ```bash
-# Using GitHub Models API (default)
-java -cp target/ba-assistant-1.0.jar com.ayerma.assistant.ContentCreatorRunner PROJ-123
+# Stage 1: Generate questions
+CONTENT_CREATOR_MODE=questions \
+MODELS_TOKEN=<token> \
+JIRA_ISSUE_KEY=PROJ-123 \
+java -cp target/ai-assistant-2-automation-0.1.0-all.jar com.ayerma.assistant.ContentCreatorRunner
 
-# Using GitHub Copilot CLI
+# Stage 2: Answer questions (using Models API)
+CONTENT_CREATOR_MODE=answers \
+USE_MODELS_API=true \
+MODELS_TOKEN=<token> \
+JIRA_ISSUE_KEY=PROJ-123 \
+CONTENT_CREATOR_QUESTIONS_INPUT_PATH=content-creator-questions.json \
+java -cp target/ai-assistant-2-automation-0.1.0-all.jar com.ayerma.assistant.ContentCreatorRunner
+
+# Stage 2: Answer questions (using Copilot CLI)
+CONTENT_CREATOR_MODE=answers \
 USE_MODELS_API=false \
-java -cp target/ba-assistant-1.0.jar com.ayerma.assistant.ContentCreatorRunner PROJ-123
-
-# With custom model (uses gpt-5 by default)
-MODELS_MODEL=gpt-5 \
-java -cp target/ba-assistant-1.0.jar com.ayerma.assistant.ContentCreatorRunner PROJ-123
+COPILOT_GITHUB_TOKEN=<token> \
+JIRA_ISSUE_KEY=PROJ-123 \
+CONTENT_CREATOR_QUESTIONS_INPUT_PATH=content-creator-questions.json \
+java -cp target/ai-assistant-2-automation-0.1.0-all.jar com.ayerma.assistant.ContentCreatorRunner
 ```
 
 **Environment Variables:**
 
-- `CONTENT_CREATOR_INSTRUCTIONS_PATH` (default: `instructions/platform/roles/content-creator-role.md`)
+**Stage 1 (Questions):**
+
+- `CONTENT_CREATOR_MODE` (set to `questions`)
+- `CONTENT_CREATOR_QUESTIONS_INSTRUCTIONS_PATH` (default: `instructions/platform/roles/content-creator-questions-role.md`)
+- `CONTENT_CREATOR_QUESTIONS_OUTPUT_PATH` (default: `content-creator-questions.json`)
+- `MODELS_TOKEN` (required) - GitHub Models API token
+- `MODELS_MODEL` (default: `gpt-5`)
+- `MODELS_ENDPOINT` (default: `https://models.inference.ai.azure.com`)
+
+**Stage 2 (Answers):**
+
+- `CONTENT_CREATOR_MODE` (set to `answers`)
+- `CONTENT_CREATOR_ANSWER_INSTRUCTIONS_PATH` (default: `instructions/platform/roles/content-creator-role.md`)
+- `TECHNICAL_REQUIREMENTS_PATH` (default: `instructions/platform/technical/java-specialist.md`)
+- `CONTENT_INSTRUCTIONS_PATH` (default: `instructions/platform/technical/content-instructions.md`)
+- `CONTENT_CREATOR_QUESTIONS_INPUT_PATH` (default: `content-creator-questions.json`)
 - `CONTENT_CREATOR_OUTPUT_PATH` (default: `content-creator-output.json`)
-- `CONTENT_CREATOR_PROMPT_OUTPUT_PATH` (default: `content-creator-prompt.txt`)
+- `TARGET_REPO_PATH` (default: `target-repo`) - Location of target repository
 - `USE_MODELS_API` (default: `true`) - set to `false` to use GitHub Copilot CLI
-- `MODELS_MODEL` (default: `gpt-5`) - uses latest GPT-5 model for highest quality
-- `COPILOT_CLI_COMMAND` (default: `copilot`) - CLI executable name
-- `OUTPUT_PROMPT_ONLY` (default: `false`) - set to `true` to generate prompt and exit
-- `ENRICH_JIRA_FROM_OUTPUT` (default: `false`) - set to `true` to enrich Jira from existing JSON output
+- `MODELS_TOKEN` (required if `USE_MODELS_API=true`)
+- `COPILOT_GITHUB_TOKEN` (required if `USE_MODELS_API=false`)
+
+**Legacy Mode:**
+
+- `CONTENT_CREATOR_MODE` (set to `legacy` or omit) - runs the original single-step Q&A generation
 
 **Output Files:**
 
-- `content-creator-prompt.txt` - Generated prompt combining role instructions and topic
-- `content-creator-output.json` - AI-generated JSON with interview questions and answers
+- `content-creator-questions.json` - Generated question list (Stage 1)
+- `content-creator-output.json` - Final Q&A pairs (Stage 2)
 
 ### Example
 
@@ -239,18 +315,32 @@ Jira Issue: PROJ-123
 Title/Summary: Java Streams API
 ```
 
-**Output JSON Structure:**
+**Stage 1 Output (Questions JSON):**
+
+```json
+{
+  "topic": "Java Streams API",
+  "questions": [
+    "What is the Java Stream API and when was it introduced?",
+    "What is the difference between intermediate and terminal operations in Streams?",
+    "...",
+    "How do you debug complex Stream pipelines and what tools are available?"
+  ]
+}
+```
+
+**Stage 2 Output (Final Q&A JSON):**
 
 ```json
 {
   "topic": "Java Streams API",
   "questions": [
     {
-      "question": "What is the Java Stream API and how does it differ from Collections?",
+      "question": "What is the Java Stream API and when was it introduced?",
       "answer": "The Java Stream API, introduced in Java 8, provides a functional programming approach to process sequences of elements..."
     },
     {
-      "question": "Explain the difference between intermediate and terminal operations in Streams.",
+      "question": "What is the difference between intermediate and terminal operations in Streams?",
       "answer": "Intermediate operations (filter, map, flatMap, distinct, sorted, peek, limit, skip) return a new Stream..."
     }
   ]
@@ -262,26 +352,27 @@ Title/Summary: Java Streams API
 The ticket receives a formatted comment with:
 
 - Topic header
-- Numbered Q&A pairs
+- Numbered Q&A pairs (15 questions total)
 - Total question count
 - Labels: `interview-content`, `ai-generated`
 
-### Dual-Mode Support
+### Key Features
 
-Content-Creator supports both execution modes:
+- **15 questions per topic**: Balanced coverage from fundamental to advanced
+- **Dual-mode support**: Stage 2 can use GitHub Models API or Copilot CLI
+- **External triggering**: Stage 2 can be triggered independently with custom questions
+- **Pull Request workflow**: Always creates PR for review; optional auto-merge with `AUTOMERGE=true`
+- **ADDING_CONTENT.md validation**: Ensures proper content formatting guidelines are available
+- **Java specialist guidance**: Answers follow senior developer best practices
+- **Structured difficulty progression**: Questions ordered from easiest to most complex
+- **Mix of question types**: Popular + underrated + professional-level questions
 
-- **GitHub Models API mode** (default): Direct API calls to GitHub Models with GPT-5
-- **GitHub Copilot CLI mode**: Uses local Copilot CLI for interactive development (set `USE_MODELS_API=false`)
+### Instruction Files
+
+- `instructions/platform/roles/content-creator-questions-role.md` - Question generation instructions (Stage 1)
+- `instructions/platform/roles/content-creator-role.md` - Answer format instructions (Stage 2)
+- `instructions/platform/technical/java-specialist.md` - Senior Java developer persona and answer quality guidance (Stage 2)
 
 ### Runner Class
 
-`com.ayerma.assistant.ContentCreatorRunner` - Can be run standalone or via workflow
-
-### Recommended Configuration
-
-For highest quality interview content (default configuration):
-
-```bash
-MODELS_MODEL=gpt-5
-USE_MODELS_API=true
-```
+`com.ayerma.assistant.ContentCreatorRunner` - Supports three modes: `questions`, `answers`, `legacy`

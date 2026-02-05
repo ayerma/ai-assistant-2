@@ -1,0 +1,335 @@
+name: Jira -> Answer Questions
+
+on:
+  workflow_dispatch:
+    inputs:
+      ticket_id:
+        description: "Jira issue key (e.g., PROJ-123)"
+        required: true
+        type: string
+      questions_json:
+        description: "Questions JSON object: {topic, questions:[...]}"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  answer-questions:
+    runs-on: ubuntu-latest
+
+    env:
+      TARGET_REPO: ${{ vars.TARGET_REPO }}
+      TARGET_REF: ${{ vars.TARGET_REF || 'main' }}
+      TARGET_REPO_PATH: ${{ vars.TARGET_REPO_PATH || 'target-repo' }}
+      TARGET_REPO_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Build
+        run: mvn -q -DskipTests package
+
+      - name: Clone target repository
+        run: |
+          if [ -z "$TARGET_REPO" ]; then
+            echo "[ERROR] TARGET_REPO is required (format: owner/repo)"
+            exit 1
+          fi
+
+          if [ -n "$TARGET_REPO_TOKEN" ]; then
+            CLONE_URL="https://x-access-token:${TARGET_REPO_TOKEN}@github.com/${TARGET_REPO}.git"
+          else
+            CLONE_URL="https://github.com/${TARGET_REPO}.git"
+          fi
+
+          echo "[INFO] Cloning $TARGET_REPO@$TARGET_REF into $TARGET_REPO_PATH"
+          git clone --depth 1 --branch "$TARGET_REF" "$CLONE_URL" "$TARGET_REPO_PATH"
+
+          # Configure git with token for all operations
+          cd "$TARGET_REPO_PATH"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if [ -n "$TARGET_REPO_TOKEN" ]; then
+            # Update remote URL to use token for push operations
+            git remote set-url origin "https://x-access-token:${TARGET_REPO_TOKEN}@github.com/${TARGET_REPO}.git"
+            
+            # Configure git to use the token globally for this runner
+            git config --global credential.helper store
+            echo "https://x-access-token:${TARGET_REPO_TOKEN}@github.com" > ~/.git-credentials
+            
+            # Also set url insteadOf for https GitHub URLs
+            git config --global url."https://x-access-token:${TARGET_REPO_TOKEN}@github.com/".insteadOf "https://github.com/"
+          fi
+
+      - name: Install GitHub Copilot CLI
+        if: ${{ vars.USE_MODELS_API == 'false' }}
+        run: |
+          echo "Installing GitHub Copilot CLI..."
+          npm install -g @github/copilot
+
+          # Add npm bin to PATH
+          NPM_PREFIX=$(npm prefix -g)
+          echo "$NPM_PREFIX/bin" >> $GITHUB_PATH
+
+          echo "Copilot CLI installed successfully"
+
+      - name: Prepare questions JSON
+        run: |
+          echo "[INFO] Writing questions JSON to file..."
+          echo '${{ inputs.questions_json }}' > content-creator-questions.json
+
+          # Validate JSON
+          jq . content-creator-questions.json > /dev/null
+
+          TOPIC=$(jq -r '.topic' content-creator-questions.json)
+          QUESTION_COUNT=$(jq '.questions | length' content-creator-questions.json)
+          echo "[INFO] Topic: $TOPIC"
+          echo "[INFO] Question count: $QUESTION_COUNT"
+
+      - name: Answer questions
+        env:
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+
+          MODELS_TOKEN: ${{ secrets.MODELS_TOKEN }}
+          MODELS_ENDPOINT: ${{ vars.MODELS_ENDPOINT }}
+          MODELS_MODEL: ${{ vars.MODELS_MODEL || 'gpt-5' }}
+
+          GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+
+          USE_MODELS_API: ${{ vars.USE_MODELS_API || 'true' }}
+          CONTENT_CREATOR_MODE: answers
+          CONTENT_CREATOR_ANSWER_INSTRUCTIONS_PATH: instructions/platform/roles/content-creator-role.md
+          TECHNICAL_REQUIREMENTS_PATH: instructions/platform/technical/java-specialist.md
+          CONTENT_CREATOR_QUESTIONS_INPUT_PATH: content-creator-questions.json
+          CONTENT_CREATOR_OUTPUT_PATH: content-creator-output.json
+
+          JIRA_ISSUE_KEY: ${{ inputs.ticket_id }}
+        run: |
+          echo "[INFO] Answering questions using Java specialist guidance..."
+          java -cp target/ai-assistant-2-automation-0.1.0-all.jar com.ayerma.assistant.ContentCreatorRunner
+
+      - name: Enrich target repository with Q&A content and create PR using Copilot CLI
+        env:
+          GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+        run: |
+          echo "[INFO] Enriching target repository with interview Q&A content..."
+
+          # Read the generated Q&A content
+          TOPIC=$(jq -r '.topic' content-creator-output.json)
+          echo "[INFO] Topic: $TOPIC"
+
+          # Create sanitized branch name from topic
+          BRANCH_NAME="content/$(echo "$TOPIC" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//')"
+          BRANCH_NAME="${BRANCH_NAME}-${{ inputs.ticket_id }}"
+          echo "[INFO] Branch name: $BRANCH_NAME"
+
+          # Build prompt for Copilot CLI to create files and PR
+          PROMPT="You are a technical content organizer with GitHub repository management capabilities.
+
+          I have generated Java interview questions with answers for the topic: '$TOPIC'.
+          The Q&A content is in the file content-creator-output.json in JSON format with structure:
+          {
+            \"topic\": \"...\",
+            \"questions\": [{\"question\": \"...\", \"answer\": \"...\"}]
+          }
+
+          Your task:
+          1. Read the content-creator-output.json file
+          2. Create a new branch named: $BRANCH_NAME
+          3. Create well-structured markdown files in the $TARGET_REPO_PATH repository
+          4. Organize the content logically (e.g., create a folder structure like 'interview-questions/java/<topic-name>.md')
+          5. Format each question-answer pair clearly with proper markdown formatting
+          6. Include a table of contents if there are many questions
+          7. Add any helpful metadata (topic, question count, etc.)
+          8. Commit all changes with message: 'Add interview questions: $TOPIC'
+          9. Push the branch to origin
+          10. Create a Pull Request with:
+              - Title: 'Add Interview Q&A: $TOPIC'
+              - Body: 'Auto-generated interview questions and answers from Jira ticket ${{ inputs.ticket_id }}.\n\nTopic: $TOPIC\nGenerated by: Content-Creator workflow'
+              - Base branch: $TARGET_REF
+
+          Repository location: $TARGET_REPO_PATH
+
+          CRITICAL: After creating the PR, you MUST output a JSON object with the PR URL in this EXACT format:
+          {\"pull_request_url\": \"https://github.com/$TARGET_REPO/pull/NUMBER\", \"summary\": \"Created PR for interview questions\"}
+
+          Make sure the content is well-formatted, professional, and easy to read."
+
+          echo "[INFO] Calling Copilot CLI to create files and PR in target repository..."
+          cd "$TARGET_REPO_PATH"
+
+          # Run copilot and capture output
+          copilot --allow-all-tools -p "$PROMPT" 2>&1 | tee ../copilot-output.txt
+
+          echo "[INFO] Copilot CLI execution completed"
+
+      - name: Extract PR URL from Copilot output
+        run: |
+          echo "[INFO] Extracting PR URL from Copilot output..."
+
+          # Use Python to parse the output and extract PR URL
+          python3 << 'EOF'
+          import re
+          import json
+          import sys
+
+          try:
+              with open('copilot-output.txt', 'r') as f:
+                  output = f.read()
+              
+              print('[DEBUG] Raw output length:', len(output))
+              
+              # Try multiple patterns to find PR URL
+              patterns = [
+                  # Look for pull_request_url specifically (our expected format)
+                  (r'(\{[^}]*"pull_request_url"[^}]*"summary"[^}]*\})', 'PR URL format'),
+                  # Try nested JSON
+                  (r'(\{(?:[^{}]|\{[^{}]*\})*"pull_request_url"(?:[^{}]|\{[^{}]*\})*\})', 'nested PR format'),
+              ]
+              
+              result_json = None
+              for pattern, desc in patterns:
+                  matches = re.findall(pattern, output, re.DOTALL)
+                  if matches:
+                      print(f'[DEBUG] Found {len(matches)} matches with pattern: {desc}')
+                      # Try each match
+                      for match in matches:
+                          try:
+                              candidate = json.loads(match)
+                              if isinstance(candidate, dict) and 'pull_request_url' in candidate:
+                                  result_json = candidate
+                                  print(f'[SUCCESS] Found valid JSON with PR URL: {result_json}')
+                                  break
+                          except json.JSONDecodeError:
+                              continue
+                  if result_json:
+                      break
+              
+              if not result_json:
+                  print('[ERROR] No valid JSON with pull_request_url found in copilot output')
+                  print('[DEBUG] Output preview:', output[-500:])
+                  # Create a placeholder
+                  result_json = {
+                      'pull_request_url': 'ERROR: Could not extract PR URL from copilot output',
+                      'summary': 'PR may have been created but URL extraction failed'
+                  }
+              
+              # Write to file for next step
+              with open('pr-info.json', 'w') as f:
+                  json.dump(result_json, f, indent=2)
+              
+              print('[SUCCESS] Wrote PR info to pr-info.json')
+              
+          except Exception as e:
+              print(f'[ERROR] Failed to parse copilot output: {e}')
+              sys.exit(1)
+          EOF
+
+          # Show the extracted info
+          cat pr-info.json
+
+      - name: Auto-merge PR
+        if: ${{ vars.AUTOMERGE == 'true' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+        run: |
+          echo "[INFO] Automerge enabled - attempting to merge PR"
+
+          PR_URL=$(python3 -c "import json; data=json.load(open('pr-info.json')); print(data.get('pull_request_url', ''))")
+
+          if [ -z "$PR_URL" ] || [[ "$PR_URL" == ERROR* ]]; then
+            echo "[WARN] No valid PR URL found - skipping automerge"
+            exit 0
+          fi
+
+          echo "[INFO] PR URL: $PR_URL"
+
+          # Extract PR number from URL
+          PR_NUMBER=$(echo "$PR_URL" | grep -oP '/pull/\K[0-9]+')
+
+          if [ -z "$PR_NUMBER" ]; then
+            echo "[ERROR] Could not extract PR number from URL: $PR_URL"
+            exit 1
+          fi
+
+          echo "[INFO] PR Number: $PR_NUMBER"
+
+          # Navigate to target repo for gh CLI context
+          cd "$TARGET_REPO_PATH"
+
+          # Use GitHub CLI to merge the PR
+          gh pr merge "$PR_NUMBER" --merge --delete-branch || {
+            echo "[WARN] Auto-merge failed - PR may require review or have conflicts"
+            exit 0
+          }
+
+          echo "[SUCCESS] PR #$PR_NUMBER merged successfully"
+          echo "MERGE_SUCCESS=true" >> $GITHUB_ENV
+
+      - name: Update Jira with merge status
+        if: ${{ vars.AUTOMERGE == 'true' && env.MERGE_SUCCESS == 'true' }}
+        env:
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+        run: |
+          TOPIC=$(jq -r '.topic' content-creator-output.json)
+          PR_URL=$(python3 -c "import json; data=json.load(open('pr-info.json')); print(data.get('pull_request_url', ''))")
+
+          COMMENT="✅ **Interview Q&A Content Merged**\n\nTopic: **$TOPIC**\n\nThe pull request has been automatically merged to the target repository.\n\n🔗 [View Merged PR]($PR_URL)\n\n[View Workflow Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+
+          curl -X POST "$JIRA_BASE_URL/rest/api/3/issue/${{ inputs.ticket_id }}/comment" \
+            -H "Content-Type: application/json" \
+            -u "$JIRA_EMAIL:$JIRA_API_TOKEN" \
+            -d "$(jq -n --arg comment "$COMMENT" '{body: {type: "doc", version: 1, content: [{type: "paragraph", content: [{type: "text", text: $comment}]}]}}')" || {
+            echo "[WARN] Failed to add merge comment to Jira"
+          }
+
+      - name: Update Jira with PR (no auto-merge)
+        if: ${{ vars.AUTOMERGE != 'true' }}
+        env:
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+        run: |
+          TOPIC=$(jq -r '.topic' content-creator-output.json)
+          PR_URL=$(python3 -c "import json; data=json.load(open('pr-info.json')); print(data.get('pull_request_url', ''))")
+          QUESTION_COUNT=$(jq '.questions | length' content-creator-output.json)
+
+          COMMENT="📝 **Interview Q&A Content Ready for Review**\n\nTopic: **$TOPIC**\nQuestions: **$QUESTION_COUNT**\n\nA pull request has been created with the generated content.\n\n🔗 [Review Pull Request]($PR_URL)\n\n[View Workflow Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+
+          curl -X POST "$JIRA_BASE_URL/rest/api/3/issue/${{ inputs.ticket_id }}/comment" \
+            -H "Content-Type: application/json" \
+            -u "$JIRA_EMAIL:$JIRA_API_TOKEN" \
+            -d "$(jq -n --arg comment "$COMMENT" '{body: {type: "doc", version: 1, content: [{type: "paragraph", content: [{type: "text", text: $comment}]}]}}')" || {
+            echo "[WARN] Failed to add PR comment to Jira"
+          }
+
+      - name: Upload result
+        uses: actions/upload-artifact@v4
+        with:
+          name: content-creator-output
+          path: |
+            content-creator-questions.json
+            content-creator-output.json
+            copilot-output.txt
+            pr-info.json
