@@ -4,6 +4,8 @@ import com.ayerma.assistant.client.BaAssistantClient;
 import com.ayerma.assistant.client.cli.GitHubCopilotCliClient;
 import com.ayerma.assistant.client.models.GitHubModelsClient;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -12,6 +14,216 @@ import java.nio.file.Path;
 public final class ContentCreatorRunner {
     public static void main(String[] args) throws Exception {
         System.out.println("[INFO] Starting Content Creator Runner...");
+
+        String mode = Env.optional("CONTENT_CREATOR_MODE", "legacy");
+        System.out.println("[INFO] Mode: " + mode);
+
+        switch (mode) {
+            case "questions":
+                runQuestionsMode(args);
+                break;
+            case "answers":
+                runAnswersMode(args);
+                break;
+            case "legacy":
+            default:
+                runLegacyMode(args);
+                break;
+        }
+    }
+
+    private static void runQuestionsMode(String[] args) throws Exception {
+        System.out.println("[INFO] Running in QUESTIONS mode - generating question list...");
+
+        String issueKey = args.length > 0 ? args[0] : Env.required("JIRA_ISSUE_KEY");
+        System.out.println("[INFO] Processing Jira issue: " + issueKey);
+
+        String jiraBaseUrl = Env.required("JIRA_BASE_URL");
+        String jiraEmail = Env.required("JIRA_EMAIL");
+        String jiraApiToken = Env.required("JIRA_API_TOKEN");
+
+        HttpJson jiraHttp = new HttpJson();
+        JiraClient jiraClient = new JiraClient(jiraHttp, jiraBaseUrl, jiraEmail, jiraApiToken);
+
+        // Get topic from Jira or input
+        String providedSummary = Env.optional("JIRA_ISSUE_SUMMARY", null);
+        String topic;
+        if (providedSummary != null && !providedSummary.isBlank()) {
+            System.out.println("[INFO] Using provided summary as topic (skipping Jira API call)");
+            topic = providedSummary;
+        } else {
+            System.out.println("[INFO] Fetching issue details from Jira API...");
+            JsonNode issue = jiraClient.getIssue(issueKey);
+            System.out.println("[INFO] Successfully fetched issue from Jira");
+            topic = textAt(issue, "/fields/summary");
+        }
+
+        // Load instructions for question generation
+        String instructionsPath = Env.contentCreatorQuestionsInstructionsPath();
+        System.out.println("[INFO] Loading question generation instructions from: " + instructionsPath);
+        String systemPrompt = Files.readString(Path.of(instructionsPath), StandardCharsets.UTF_8);
+
+        // Build user prompt for question generation
+        String userPrompt = buildQuestionsUserPrompt(issueKey, topic);
+
+        // Always use GitHub Models API for question generation
+        String modelsEndpoint = Env.optional("MODELS_ENDPOINT", "https://models.inference.ai.azure.com");
+        String modelsApiKey = Env.required("MODELS_TOKEN");
+        String model = Env.optional("MODELS_MODEL", "gpt-5");
+
+        System.out.println("[INFO] Using GitHub Models API: " + model + " at " + modelsEndpoint);
+
+        HttpJson modelsHttp = new HttpJson();
+        BaAssistantClient client = new GitHubModelsClient(modelsHttp, modelsEndpoint, modelsApiKey, model);
+
+        System.out.println("[INFO] Calling AI to generate question list...");
+        String assistantOutput = client.runBaAssistant(systemPrompt, userPrompt);
+        System.out.println("[INFO] Received response from AI");
+
+        // Validate and write questions JSON
+        System.out.println("[INFO] Validating and formatting JSON output...");
+        JsonNode parsed = HttpJson.MAPPER.readTree(assistantOutput);
+
+        String outputPath = Env.contentCreatorQuestionsOutputPath();
+        Files.writeString(Path.of(outputPath),
+                HttpJson.MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(parsed),
+                StandardCharsets.UTF_8);
+        System.out.println("[SUCCESS] Wrote questions list to: " + outputPath);
+    }
+
+    private static void runAnswersMode(String[] args) throws Exception {
+        System.out.println("[INFO] Running in ANSWERS mode - answering questions...");
+
+        String issueKey = args.length > 0 ? args[0] : Env.required("JIRA_ISSUE_KEY");
+        System.out.println("[INFO] Processing Jira issue: " + issueKey);
+
+        String jiraBaseUrl = Env.required("JIRA_BASE_URL");
+        String jiraEmail = Env.required("JIRA_EMAIL");
+        String jiraApiToken = Env.required("JIRA_API_TOKEN");
+
+        HttpJson jiraHttp = new HttpJson();
+        JiraClient jiraClient = new JiraClient(jiraHttp, jiraBaseUrl, jiraEmail, jiraApiToken);
+
+        // Read questions JSON
+        String questionsInputPath = Env.contentCreatorQuestionsInputPath();
+        System.out.println("[INFO] Reading questions from: " + questionsInputPath);
+        String questionsJson = Files.readString(Path.of(questionsInputPath), StandardCharsets.UTF_8);
+        JsonNode questionsData = HttpJson.MAPPER.readTree(questionsJson);
+
+        String topic = questionsData.path("topic").asText("");
+        JsonNode questions = questionsData.path("questions");
+
+        if (questions == null || !questions.isArray() || questions.isEmpty()) {
+            throw new IllegalStateException("Questions array is missing or empty in " + questionsInputPath);
+        }
+
+        System.out.println("[INFO] Topic: " + topic);
+        System.out.println("[INFO] Found " + questions.size() + " questions to answer");
+
+        // Validate ADDING_CONTENT.md file exists in target repository
+        String targetRepoPath = Env.targetRepoPath();
+        Path addingContentPath = Path.of(targetRepoPath, "public", "data", "ADDING_CONTENT.md");
+        
+        System.out.println("[INFO] Validating ADDING_CONTENT.md at: " + addingContentPath);
+        if (!Files.exists(addingContentPath)) {
+            System.err.println("[ERROR] ADDING_CONTENT.md file not found at: " + addingContentPath);
+            System.err.println("[ERROR] This file contains instructions for properly formatting questions.");
+            System.err.println("[ERROR] Please ensure the target repository is checked out to: " + targetRepoPath);
+            throw new IllegalStateException("Required file ADDING_CONTENT.md not found at " + addingContentPath);
+        }
+        
+        if (!Files.isReadable(addingContentPath)) {
+            System.err.println("[ERROR] ADDING_CONTENT.md file exists but cannot be read: " + addingContentPath);
+            throw new IllegalStateException("Cannot read required file: " + addingContentPath);
+        }
+        
+        System.out.println("[SUCCESS] ADDING_CONTENT.md file validated successfully");
+        String addingContentGuidelines = Files.readString(addingContentPath, StandardCharsets.UTF_8);
+
+        // Load instructions for answering (role + technical Java specialist)
+        String answerInstructionsPath = Env.contentCreatorAnswerInstructionsPath();
+        String javaSpecialistPath = Env.optional("TECHNICAL_REQUIREMENTS_PATH",
+                "instructions/platform/technical/java-specialist.md");
+
+        System.out.println("[INFO] Loading answer instructions from: " + answerInstructionsPath);
+        String roleInstructions = Files.readString(Path.of(answerInstructionsPath), StandardCharsets.UTF_8);
+
+        String javaSpecialist = "";
+        Path javaSpecPath = Path.of(javaSpecialistPath);
+        if (Files.exists(javaSpecPath)) {
+            System.out.println("[INFO] Loading Java specialist guidance from: " + javaSpecialistPath);
+            javaSpecialist = "\n\n" + Files.readString(javaSpecPath, StandardCharsets.UTF_8);
+        }
+
+        // Load content instructions (includes ADDING_CONTENT.md guidelines)
+        String contentInstructions = "";
+        String contentInstructionsPath = Env.contentInstructionsPath();
+        Path contentInstructionsFile = Path.of(contentInstructionsPath);
+        if (Files.exists(contentInstructionsFile)) {
+            System.out.println("[INFO] Loading content formatting guidelines from: " + contentInstructionsPath);
+            contentInstructions = "\n\n" + Files.readString(contentInstructionsFile, StandardCharsets.UTF_8);
+            // Append the actual ADDING_CONTENT.md content for reference
+            contentInstructions += "\n\n---\n# ADDING_CONTENT.md Reference\n\n" + addingContentGuidelines;
+        }
+
+        String systemPrompt = roleInstructions + javaSpecialist + contentInstructions
+                + "\n\nIMPORTANT: Follow the instructions exactly. Return ONLY the strict JSON object.";
+
+        // Determine which client to use
+        boolean useModelsApi = Env.optional("USE_MODELS_API", "true").equalsIgnoreCase("true");
+        System.out.println("[INFO] Client mode: " + (useModelsApi ? "GitHub Models API" : "GitHub Copilot CLI"));
+
+        BaAssistantClient client;
+        if (useModelsApi) {
+            String modelsEndpoint = Env.optional("MODELS_ENDPOINT", "https://models.inference.ai.azure.com");
+            String modelsApiKey = Env.required("MODELS_TOKEN");
+            String model = Env.optional("MODELS_MODEL", "gpt-5");
+            System.out.println("[INFO] Using model: " + model + " at " + modelsEndpoint);
+
+            HttpJson modelsHttp = new HttpJson();
+            client = new GitHubModelsClient(modelsHttp, modelsEndpoint, modelsApiKey, model);
+        } else {
+            String cliCommand = Env.optional("COPILOT_CLI_COMMAND", "copilot");
+            System.out.println("[INFO] Using CLI command: " + cliCommand);
+            client = new GitHubCopilotCliClient(cliCommand);
+        }
+
+        // Answer each question
+        ArrayNode answeredQuestions = HttpJson.MAPPER.createArrayNode();
+        int questionNumber = 1;
+        for (JsonNode questionNode : questions) {
+            String question = questionNode.asText("");
+            System.out
+                    .println("[INFO] Answering question " + questionNumber + "/" + questions.size() + ": " + question);
+
+            String userPrompt = buildAnswerUserPrompt(topic, question);
+            String assistantOutput = client.runBaAssistant(systemPrompt, userPrompt);
+            System.out.println("[DEBUG] Received answer for question " + questionNumber);
+
+            // Parse the answer JSON
+            JsonNode answerData = HttpJson.MAPPER.readTree(assistantOutput);
+            answeredQuestions.add(answerData);
+
+            questionNumber++;
+        }
+
+        // Build final output
+        ObjectNode finalOutput = HttpJson.MAPPER.createObjectNode();
+        finalOutput.put("topic", topic);
+        finalOutput.set("questions", answeredQuestions);
+
+        String outputPath = Env.contentCreatorOutputPath();
+        Files.writeString(Path.of(outputPath),
+                HttpJson.MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(finalOutput),
+                StandardCharsets.UTF_8);
+        System.out.println("[SUCCESS] Wrote final Q&A output to: " + outputPath);
+
+        // Enrich Jira ticket with Q&A content
+        enrichJiraTicketFromOutput(jiraClient, issueKey, finalOutput);
+    }
+
+    private static void runLegacyMode(String[] args) throws Exception {
+        System.out.println("[INFO] Running in LEGACY mode - single-step Q&A generation...");
 
         String issueKey = args.length > 0 ? args[0] : Env.required("JIRA_ISSUE_KEY");
         System.out.println("[INFO] Processing Jira issue: " + issueKey);
@@ -81,8 +293,7 @@ public final class ContentCreatorRunner {
         System.out.println("[INFO] Wrote combined prompt to: " + promptOutputPath);
         System.out.println("[INFO] Total prompt length: " + combinedPrompt.length() + " characters");
 
-        // Check if we should just output the prompt and exit (CLI mode handles
-        // execution in workflow)
+        // Check if we should just output the prompt and exit
         boolean outputPromptOnly = Env.optional("OUTPUT_PROMPT_ONLY", "false").equalsIgnoreCase("true");
 
         if (outputPromptOnly) {
@@ -119,6 +330,30 @@ public final class ContentCreatorRunner {
 
         // Enrich Jira ticket with Q&A content
         enrichJiraTicketFromOutput(jiraClient, issueKey, parsed);
+    }
+
+    private static String buildQuestionsUserPrompt(String issueKey, String topic) {
+        StringBuilder prompt = new StringBuilder();
+        prompt.append("Generate a list of Java interview questions for the following topic:\n\n");
+        prompt.append("Jira Issue: ").append(issueKey).append("\n");
+        prompt.append("Topic: ").append(topic).append("\n\n");
+        prompt.append("Generate exactly 15 questions:\n");
+        prompt.append("- Include the most popular questions\n");
+        prompt.append("- Include underrated, high-signal questions\n");
+        prompt.append("- Questions suitable to ask an experienced professional\n");
+        prompt.append("- Ordered by gradually increasing difficulty\n\n");
+        prompt.append("Return ONLY the JSON object following the exact schema defined in the instructions.\n");
+        return prompt.toString();
+    }
+
+    private static String buildAnswerUserPrompt(String topic, String question) {
+        StringBuilder prompt = new StringBuilder();
+        prompt.append("Topic: ").append(topic).append("\n\n");
+        prompt.append("Question: ").append(question).append("\n\n");
+        prompt.append(
+                "Provide a comprehensive answer to this Java interview question following the Java specialist guidance.\n");
+        prompt.append("Return ONLY the JSON object following the exact schema defined in the instructions.\n");
+        return prompt.toString();
     }
 
     private static String loadSystemPrompt(String instructionsPath, String technicalReqPath) throws Exception {

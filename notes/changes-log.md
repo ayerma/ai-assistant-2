@@ -1,5 +1,44 @@
 # Changes Log
 
+## February 5, 2026 - Milestone: Add ADDING_CONTENT.md Validation in Answers Flow
+
+### Summary
+
+Enhanced the Content-Creator answers flow with mandatory validation of the `ADDING_CONTENT.md` file from the target repository. The flow now ensures proper content formatting guidelines are available before generating answers, stopping execution with clear error messages if the file is missing or inaccessible.
+
+### Key Accomplishments
+
+- ✅ Added validation check for `{target-repo}/public/data/ADDING_CONTENT.md` in `runAnswersMode`
+- ✅ Implemented error handling that stops the flow if ADDING_CONTENT.md is missing or unreadable
+- ✅ Created `content-instructions.md` with comprehensive content formatting guidelines
+- ✅ Enhanced system prompt to include ADDING_CONTENT.md content for AI context
+- ✅ Added environment variables: `targetRepoPath()` and `contentInstructionsPath()` in `Env.java`
+- ✅ Integrated content guidelines into Copilot CLI prompt for better answer quality
+
+### Validation Behavior
+
+**Pre-execution Checks:**
+1. Validates `ADDING_CONTENT.md` exists at `{TARGET_REPO_PATH}/public/data/ADDING_CONTENT.md`
+2. Verifies file is readable
+3. If validation fails → displays error messages and throws `IllegalStateException`
+4. If validation succeeds → loads content and enriches AI prompt
+
+**Error Messages:**
+- `[ERROR] ADDING_CONTENT.md file not found at: {path}`
+- `[ERROR] This file contains instructions for properly formatting questions.`
+- `[ERROR] Please ensure the target repository is checked out to: {path}`
+
+### Configuration
+
+**New environment variables:**
+- `TARGET_REPO_PATH` (default: `target-repo`) - Location of target repository
+- `CONTENT_INSTRUCTIONS_PATH` (default: `instructions/platform/technical/content-instructions.md`)
+
+**Updated files:**
+- `ContentCreatorRunner.java` - Added validation logic in `runAnswersMode()`
+- `Env.java` - Added helper methods for new configuration
+- `instructions/platform/technical/content-instructions.md` - Created comprehensive guidelines
+
 ## February 4, 2026 - Milestone: Add Content-Creator with Target Repository Integration
 
 ### Summary

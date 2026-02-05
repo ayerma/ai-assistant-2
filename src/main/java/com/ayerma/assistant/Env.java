@@ -38,11 +38,38 @@ public final class Env {
         return optional("CONTENT_CREATOR_INSTRUCTIONS_PATH", "instructions/platform/roles/content-creator-role.md");
     }
 
+    public static String contentCreatorQuestionsInstructionsPath() {
+        return optional("CONTENT_CREATOR_QUESTIONS_INSTRUCTIONS_PATH",
+                "instructions/platform/roles/content-creator-questions-role.md");
+    }
+
+    public static String contentCreatorAnswerInstructionsPath() {
+        return optional("CONTENT_CREATOR_ANSWER_INSTRUCTIONS_PATH",
+                "instructions/platform/roles/content-creator-role.md");
+    }
+
     public static String contentCreatorOutputPath() {
         return optional("CONTENT_CREATOR_OUTPUT_PATH", "content-creator-output.json");
     }
 
     public static String contentCreatorPromptOutputPath() {
         return optional("CONTENT_CREATOR_PROMPT_OUTPUT_PATH", "content-creator-prompt.txt");
+    }
+
+    public static String contentCreatorQuestionsOutputPath() {
+        return optional("CONTENT_CREATOR_QUESTIONS_OUTPUT_PATH", "content-creator-questions.json");
+    }
+
+    public static String contentCreatorQuestionsInputPath() {
+        return optional("CONTENT_CREATOR_QUESTIONS_INPUT_PATH", "content-creator-questions.json");
+    }
+
+    // Common environment variables
+    public static String targetRepoPath() {
+        return optional("TARGET_REPO_PATH", "target-repo");
+    }
+
+    public static String contentInstructionsPath() {
+        return optional("CONTENT_INSTRUCTIONS_PATH", "instructions/platform/technical/content-instructions.md");
     }
 }
