@@ -30,7 +30,7 @@ Add these **GitHub repository secrets**:
 Optional **GitHub repository variables**:
 
 - `MODELS_ENDPOINT` (default: `https://models.inference.ai.azure.com`)
-- `MODELS_MODEL` (default: `gpt-4o-mini`)
+- `MODELS_MODEL` (default: `gpt-4o`)
 - `DEV_INSTRUCTIONS_PATH` (default: `instructions/platform/roles/dev-role.md`)
 - `TARGET_REPO` (format: `owner/repo`, required for Tech Assistant and Content-Creator)
 - `TARGET_REF` (default: `main`)
@@ -280,7 +280,7 @@ java -cp target/ai-assistant-2-automation-0.1.0-all.jar com.ayerma.assistant.Con
 - `CONTENT_CREATOR_QUESTIONS_INSTRUCTIONS_PATH` (default: `instructions/platform/roles/content-creator-questions-role.md`)
 - `CONTENT_CREATOR_QUESTIONS_OUTPUT_PATH` (default: `content-creator-questions.json`)
 - `MODELS_TOKEN` (required) - GitHub Models API token
-- `MODELS_MODEL` (default: `gpt-5`)
+- `MODELS_MODEL` (default: `gpt-4o`)
 - `MODELS_ENDPOINT` (default: `https://models.inference.ai.azure.com`)
 
 **Stage 2 (Answers):**

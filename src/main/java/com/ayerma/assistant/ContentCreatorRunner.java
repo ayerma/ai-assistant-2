@@ -69,7 +69,7 @@ public final class ContentCreatorRunner {
         // Always use GitHub Models API for question generation
         String modelsEndpoint = Env.optional("MODELS_ENDPOINT", "https://models.inference.ai.azure.com");
         String modelsApiKey = Env.required("MODELS_TOKEN");
-        String model = Env.optional("MODELS_MODEL", "gpt-5");
+        String model = Env.optional("MODELS_MODEL", "gpt-4o");
 
         System.out.println("[INFO] Using GitHub Models API: " + model + " at " + modelsEndpoint);
 
@@ -162,8 +162,8 @@ public final class ContentCreatorRunner {
         if (Files.exists(contentInstructionsFile)) {
             System.out.println("[INFO] Loading content formatting guidelines from: " + contentInstructionsPath);
             contentInstructions = "\n\n" + Files.readString(contentInstructionsFile, StandardCharsets.UTF_8);
-            // Append the actual ADDING_CONTENT.md content for reference
-            contentInstructions += "\n\n---\n# ADDING_CONTENT.md Reference\n\n" + addingContentGuidelines;
+            // Note: ADDING_CONTENT.md reference is omitted to reduce prompt size
+            // The guidelines in content-instructions.md should be sufficient
         }
 
         String systemPrompt = roleInstructions + javaSpecialist + contentInstructions
@@ -177,7 +177,7 @@ public final class ContentCreatorRunner {
         if (useModelsApi) {
             String modelsEndpoint = Env.optional("MODELS_ENDPOINT", "https://models.inference.ai.azure.com");
             String modelsApiKey = Env.required("MODELS_TOKEN");
-            String model = Env.optional("MODELS_MODEL", "gpt-5");
+            String model = Env.optional("MODELS_MODEL", "gpt-4o");
             System.out.println("[INFO] Using model: " + model + " at " + modelsEndpoint);
 
             HttpJson modelsHttp = new HttpJson();
@@ -191,18 +191,48 @@ public final class ContentCreatorRunner {
         // Answer each question
         ArrayNode answeredQuestions = HttpJson.MAPPER.createArrayNode();
         int questionNumber = 1;
+        int maxRetries = 3;
         for (JsonNode questionNode : questions) {
             String question = questionNode.asText("");
             System.out
                     .println("[INFO] Answering question " + questionNumber + "/" + questions.size() + ": " + question);
 
             String userPrompt = buildAnswerUserPrompt(topic, question);
-            String assistantOutput = client.runBaAssistant(systemPrompt, userPrompt);
+            
+            // Retry logic for API failures
+            String assistantOutput = null;
+            Exception lastError = null;
+            for (int attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                    assistantOutput = client.runBaAssistant(systemPrompt, userPrompt);
+                    break; // Success, exit retry loop
+                } catch (Exception e) {
+                    lastError = e;
+                    String errorMsg = e.getMessage();
+                    if (errorMsg != null && errorMsg.contains("missing finish_reason")) {
+                        System.err.println("[WARN] API call failed (attempt " + attempt + "/" + maxRetries + "): " + errorMsg);
+                        if (attempt < maxRetries) {
+                            int waitSeconds = attempt * 2; // Exponential backoff: 2s, 4s, 6s
+                            System.out.println("[INFO] Retrying in " + waitSeconds + " seconds...");
+                            Thread.sleep(waitSeconds * 1000);
+                        }
+                    } else {
+                        // Different error, don't retry
+                        throw e;
+                    }
+                }
+            }
+            
+            if (assistantOutput == null) {
+                System.err.println("[ERROR] Failed to get answer after " + maxRetries + " attempts");
+                throw new RuntimeException("API call failed: " + (lastError != null ? lastError.getMessage() : "Unknown error"), lastError);
+            }
+            
             System.out.println("[DEBUG] Received answer for question " + questionNumber);
 
             // Extract JSON from markdown code blocks if present
             String cleanedOutput = extractJsonFromMarkdown(assistantOutput);
-            
+
             // Parse the answer JSON
             JsonNode answerData = HttpJson.MAPPER.readTree(cleanedOutput);
             answeredQuestions.add(answerData);
@@ -257,7 +287,7 @@ public final class ContentCreatorRunner {
 
         String modelsEndpoint = Env.optional("MODELS_ENDPOINT", "https://models.inference.ai.azure.com");
         String modelsApiKey = Env.optional("MODELS_TOKEN", null);
-        String model = Env.optional("MODELS_MODEL", "gpt-5");
+        String model = Env.optional("MODELS_MODEL", "gpt-4o");
         String cliCommand = Env.optional("COPILOT_CLI_COMMAND", "copilot");
 
         if (useModelsApi) {
@@ -440,7 +470,7 @@ public final class ContentCreatorRunner {
         }
 
         String trimmed = output.trim();
-        
+
         // Check if output is wrapped in markdown code blocks
         if (trimmed.startsWith("```")) {
             // Find the first newline after opening fence
@@ -454,14 +484,14 @@ public final class ContentCreatorRunner {
             } else {
                 startIndex++; // Skip the newline
             }
-            
+
             // Find the closing fence
             int endIndex = trimmed.lastIndexOf("```");
             if (endIndex > startIndex) {
                 return trimmed.substring(startIndex, endIndex).trim();
             }
         }
-        
+
         // No markdown wrapping, return as-is
         return trimmed;
     }

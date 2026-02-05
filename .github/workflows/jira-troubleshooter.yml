@@ -65,7 +65,7 @@ jobs:
         env:
           MODELS_TOKEN: ${{ secrets.MODELS_TOKEN }}
           MODELS_ENDPOINT: ${{ vars.MODELS_ENDPOINT }}
-          MODELS_MODEL: ${{ vars.MODELS_MODEL }}
+          MODELS_MODEL: ${{ vars.MODELS_MODEL || 'gpt-4o' }}
 
           JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
           JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}

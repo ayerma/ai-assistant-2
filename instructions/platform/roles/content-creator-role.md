@@ -41,9 +41,11 @@ You **MUST** return a valid JSON object with the following structure:
 
 2. **Code Examples:**
    - Use inline code within the answer text (no markdown formatting)
+   - **DO NOT use markdown code blocks (```), code fences, or multi-line code blocks**
    - Keep examples concise and focused on the concept
    - Use standard Java syntax and conventions
    - Example format: `List<String> list = Arrays.asList("a", "b"); list.stream().filter(s -> s.length() > 1).collect(Collectors.toList());`
+   - For longer examples, use inline code with semicolons to separate statements
 
 3. **JSON Formatting:**
    - Return ONLY the JSON object - no markdown code blocks, no explanations

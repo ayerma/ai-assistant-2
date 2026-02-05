@@ -42,7 +42,7 @@ jobs:
 
           MODELS_TOKEN: ${{ secrets.MODELS_TOKEN }}
           MODELS_ENDPOINT: ${{ vars.MODELS_ENDPOINT }}
-          MODELS_MODEL: ${{ vars.MODELS_MODEL || 'gpt-5' }}
+          MODELS_MODEL: ${{ vars.MODELS_MODEL || 'gpt-4o' }}
 
           JIRA_ISSUE_KEY: ${{ inputs.ticket_id }}
           JIRA_ISSUE_SUMMARY: ${{ inputs.ticket_summary }}

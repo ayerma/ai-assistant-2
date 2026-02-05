@@ -108,7 +108,7 @@ jobs:
 
           MODELS_TOKEN: ${{ secrets.MODELS_TOKEN }}
           MODELS_ENDPOINT: ${{ vars.MODELS_ENDPOINT }}
-          MODELS_MODEL: ${{ vars.MODELS_MODEL || 'gpt-5' }}
+          MODELS_MODEL: ${{ vars.MODELS_MODEL || 'gpt-4o' }}
 
           GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
           GH_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}

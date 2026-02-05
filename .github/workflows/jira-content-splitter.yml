@@ -80,7 +80,7 @@ jobs:
 
           MODELS_TOKEN: ${{ secrets.MODELS_TOKEN }}
           MODELS_ENDPOINT: ${{ vars.MODELS_ENDPOINT }}
-          MODELS_MODEL: ${{ vars.MODELS_MODEL }}
+          MODELS_MODEL: ${{ vars.MODELS_MODEL || 'gpt-4o' }}
 
           USE_MODELS_API: true
           OUTPUT_PROMPT_ONLY: false
