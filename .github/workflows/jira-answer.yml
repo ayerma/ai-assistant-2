@@ -179,6 +179,16 @@ jobs:
           {\"pull_request_url\": \"https://github.com/$TARGET_REPO/pull/NUMBER\", \"summary\": \"Created PR for interview questions\"}
 
           Remember: Follow the ADDING_CONTENT.md instructions exactly!"
+
+          echo "[INFO] Calling Copilot CLI to create files and PR in target repository..."
+          cd "$TARGET_REPO_PATH"
+          
+          # Run copilot and capture output
+          copilot --allow-all-tools -p "$PROMPT" 2>&1 | tee ../copilot-output.txt
+          
+          echo "[INFO] Copilot CLI execution completed"
+
+      - name: Extract PR URL from Copilot output
         run: |
           echo "[INFO] Extracting PR URL from Copilot output..."
 
@@ -293,6 +303,21 @@ jobs:
             echo "[INFO] PR Number: $PR_NUMBER"
             cd "$TARGET_REPO_PATH"
           fi
+          
+          # Use GitHub CLI to merge the PR
+          gh pr merge "$PR_NUMBER" --merge --delete-branch || {
+            echo "[WARN] Auto-merge failed - PR may require review or have conflicts"
+            exit 0
+          }
+          
+          echo "[SUCCESS] PR #$PR_NUMBER merged successfully"
+          echo "MERGE_SUCCESS=true" >> $GITHUB_ENV
+
+      - name: Update Jira with merge status
+        if: ${{ vars.AUTOMERGE == 'true' && env.MERGE_SUCCESS == 'true' }}
+        env:
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
         run: |
           TOPIC=$(jq -r '.topic' content-creator-output.json)
