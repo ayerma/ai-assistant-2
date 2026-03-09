@@ -167,7 +167,13 @@ public final class ContentCreatorRunner {
         }
 
         String systemPrompt = roleInstructions + javaSpecialist + contentInstructions
-                + "\n\nIMPORTANT: Follow the instructions exactly. Return ONLY the strict JSON object.";
+                + "\n\n## CRITICAL OUTPUT RULES\n"
+                + "Your response MUST be a single raw JSON object and absolutely nothing else.\n"
+                + "- Begin your response with `{` — zero words or characters before it\n"
+                + "- End your response with `}` — zero words or characters after it\n"
+                + "- Do NOT use markdown code fences (```json or ```)\n"
+                + "- Do NOT add any preamble, explanation, or postamble\n"
+                + "- Any non-JSON characters outside the object will cause a parse failure";
 
         // Determine which client to use
         boolean useModelsApi = Env.optional("USE_MODELS_API", "true").equalsIgnoreCase("true");
@@ -198,7 +204,7 @@ public final class ContentCreatorRunner {
                     .println("[INFO] Answering question " + questionNumber + "/" + questions.size() + ": " + question);
 
             String userPrompt = buildAnswerUserPrompt(topic, question);
-            
+
             // Retry logic for API failures
             String assistantOutput = null;
             Exception lastError = null;
@@ -210,7 +216,8 @@ public final class ContentCreatorRunner {
                     lastError = e;
                     String errorMsg = e.getMessage();
                     if (errorMsg != null && errorMsg.contains("missing finish_reason")) {
-                        System.err.println("[WARN] API call failed (attempt " + attempt + "/" + maxRetries + "): " + errorMsg);
+                        System.err.println(
+                                "[WARN] API call failed (attempt " + attempt + "/" + maxRetries + "): " + errorMsg);
                         if (attempt < maxRetries) {
                             int waitSeconds = attempt * 2; // Exponential backoff: 2s, 4s, 6s
                             System.out.println("[INFO] Retrying in " + waitSeconds + " seconds...");
@@ -222,19 +229,31 @@ public final class ContentCreatorRunner {
                     }
                 }
             }
-            
+
             if (assistantOutput == null) {
                 System.err.println("[ERROR] Failed to get answer after " + maxRetries + " attempts");
-                throw new RuntimeException("API call failed: " + (lastError != null ? lastError.getMessage() : "Unknown error"), lastError);
+                throw new RuntimeException(
+                        "API call failed: " + (lastError != null ? lastError.getMessage() : "Unknown error"),
+                        lastError);
             }
-            
+
             System.out.println("[DEBUG] Received answer for question " + questionNumber);
 
             // Extract JSON from markdown code blocks if present
             String cleanedOutput = extractJsonFromMarkdown(assistantOutput);
 
             // Parse the answer JSON
-            JsonNode answerData = HttpJson.MAPPER.readTree(cleanedOutput);
+            JsonNode answerData;
+            try {
+                answerData = HttpJson.MAPPER.readTree(cleanedOutput);
+            } catch (com.fasterxml.jackson.core.JsonParseException e) {
+                System.err.println("[ERROR] Failed to parse JSON for question " + questionNumber);
+                System.err.println("[DEBUG] Raw output (first 500 chars): " +
+                        assistantOutput.substring(0, Math.min(assistantOutput.length(), 500)));
+                System.err.println("[DEBUG] Cleaned output (first 500 chars): " +
+                        cleanedOutput.substring(0, Math.min(cleanedOutput.length(), 500)));
+                throw e;
+            }
             answeredQuestions.add(answerData);
 
             questionNumber++;
@@ -401,7 +420,13 @@ public final class ContentCreatorRunner {
         }
 
         return roleInstructions + technicalReq
-                + "\n\nIMPORTANT: Follow the instructions exactly. Return ONLY the strict JSON object.";
+                + "\n\n## CRITICAL OUTPUT RULES\n"
+                + "Your response MUST be a single raw JSON object and absolutely nothing else.\n"
+                + "- Begin your response with `{` — zero words or characters before it\n"
+                + "- End your response with `}` — zero words or characters after it\n"
+                + "- Do NOT use markdown code fences (```json or ```)\n"
+                + "- Do NOT add any preamble, explanation, or postamble\n"
+                + "- Any non-JSON characters outside the object will cause a parse failure";
     }
 
     private static String buildUserPrompt(String issueKey, String summary) {
@@ -488,11 +513,66 @@ public final class ContentCreatorRunner {
             // Find the closing fence
             int endIndex = trimmed.lastIndexOf("```");
             if (endIndex > startIndex) {
-                return trimmed.substring(startIndex, endIndex).trim();
+                String extracted = trimmed.substring(startIndex, endIndex).trim();
+                // Fallback: if extracted content looks like it still has surrounding text,
+                // try to isolate the JSON object
+                return isolateJsonObject(extracted);
             }
         }
 
-        // No markdown wrapping, return as-is
-        return trimmed;
+        // No markdown wrapping — try to isolate the JSON object from the raw text
+        return isolateJsonObject(trimmed);
+    }
+
+    /**
+     * Finds the outermost JSON object or array in the given text by matching
+     * braces/brackets, ignoring any surrounding prose or extra content.
+     */
+    private static String isolateJsonObject(String text) {
+        if (text == null || text.isEmpty()) {
+            return text;
+        }
+        // Find first { or [
+        int jsonStart = -1;
+        char openChar = '{';
+        char closeChar = '}';
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '{' || c == '[') {
+                jsonStart = i;
+                openChar = c;
+                closeChar = (c == '{') ? '}' : ']';
+                break;
+            }
+        }
+        if (jsonStart == -1) {
+            return text; // No JSON found, return as-is
+        }
+        // Match to the corresponding closing brace/bracket
+        int depth = 0;
+        boolean inString = false;
+        char prev = 0;
+        for (int i = jsonStart; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (inString) {
+                if (c == '"' && prev != '\\') {
+                    inString = false;
+                }
+            } else {
+                if (c == '"') {
+                    inString = true;
+                } else if (c == openChar) {
+                    depth++;
+                } else if (c == closeChar) {
+                    depth--;
+                    if (depth == 0) {
+                        return text.substring(jsonStart, i + 1);
+                    }
+                }
+            }
+            prev = c;
+        }
+        // Could not find matching close — return from jsonStart to end as best effort
+        return text.substring(jsonStart);
     }
 }

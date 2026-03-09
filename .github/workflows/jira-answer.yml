@@ -156,7 +156,7 @@ jobs:
           CRITICAL REQUIREMENT - READ FIRST:
           Before creating any files, you MUST read and follow the instructions in the file:
           $TARGET_REPO_PATH/public/data/ADDING_CONTENT.md
-          
+
           This file contains the REQUIRED format and structure for adding content to this repository.
           You MUST follow those instructions exactly when creating the markdown files.
 
@@ -182,10 +182,10 @@ jobs:
 
           echo "[INFO] Calling Copilot CLI to create files and PR in target repository..."
           cd "$TARGET_REPO_PATH"
-          
+
           # Run copilot and capture output
           copilot --allow-all-tools -p "$PROMPT" 2>&1 | tee ../copilot-output.txt
-          
+
           echo "[INFO] Copilot CLI execution completed"
 
       - name: Extract PR URL from Copilot output
@@ -269,7 +269,7 @@ jobs:
           fi
 
           echo "[INFO] PR URL from Copilot: $PR_URL"
-          
+
           # Check if URL is a valid PR (not pull/new)
           if [[ "$PR_URL" == *"/pull/new/"* ]]; then
             echo "[WARN] URL is a PR creation page, not an actual PR"
@@ -303,13 +303,13 @@ jobs:
             echo "[INFO] PR Number: $PR_NUMBER"
             cd "$TARGET_REPO_PATH"
           fi
-          
+
           # Use GitHub CLI to merge the PR
           gh pr merge "$PR_NUMBER" --merge --delete-branch || {
             echo "[WARN] Auto-merge failed - PR may require review or have conflicts"
             exit 0
           }
-          
+
           echo "[SUCCESS] PR #$PR_NUMBER merged successfully"
           echo "MERGE_SUCCESS=true" >> $GITHUB_ENV
 

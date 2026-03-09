@@ -107,3 +107,14 @@ You **MUST** return a valid JSON object with the following structure:
 - Order questions by **gradually increasing difficulty**
 - Include a mix of **popular + underrated + professional-level** questions
 - Ensure questions are **clear, specific, and interview-appropriate**
+
+# CRITICAL OUTPUT RULES
+
+**Your entire response MUST be a single valid JSON object and nothing else.**
+
+- Start your response with `{` — no words, no sentences, no preamble before it
+- End your response with `}` — no explanation, no summary, no postamble after it
+- Do NOT wrap the JSON in markdown code fences (` ```json ` or ` ``` `)
+- Do NOT write anything like "Here is the JSON:", "Sure!", "The answer is:", or any other introductory text
+- Do NOT add trailing comments or notes after the closing `}`
+- If you cannot comply, return `{}` rather than non-JSON text
