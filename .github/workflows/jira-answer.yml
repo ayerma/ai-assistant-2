@@ -270,19 +270,32 @@ jobs:
 
           echo "[INFO] PR URL from Copilot: $PR_URL"
 
-          # Check if URL is a valid PR (not pull/new)
-          if [[ "$PR_URL" == *"/pull/new/"* ]]; then
-            echo "[WARN] URL is a PR creation page, not an actual PR"
+          # Check if URL is a valid PR (not pull/new or a compare URL)
+          if [[ "$PR_URL" == *"/pull/new/"* ]] || [[ "$PR_URL" == *"/compare/"* ]]; then
+            if [[ "$PR_URL" == *"/compare/"* ]]; then
+              echo "[WARN] URL is a compare URL, not an actual PR URL"
+              # Extract branch name from compare URL (format: .../compare/base...branch)
+              BRANCH_FROM_URL=$(echo "$PR_URL" | grep -oP '(?<=\.\.\.)[^"]+' || echo "")
+              echo "[INFO] Branch extracted from compare URL: $BRANCH_FROM_URL"
+            else
+              echo "[WARN] URL is a PR creation page, not an actual PR"
+              BRANCH_FROM_URL=""
+            fi
+
             echo "[INFO] Attempting to find the PR via GitHub CLI..."
             
             cd "$TARGET_REPO_PATH"
             
-            # Try to find recently created PR for this branch
-            BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
+            # Use branch from URL if available, otherwise fall back to git rev-parse
+            if [ -n "$BRANCH_FROM_URL" ]; then
+              BRANCH_NAME="$BRANCH_FROM_URL"
+            else
+              BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
+            fi
             echo "[INFO] Looking for PR from branch: $BRANCH_NAME"
             
             # List PRs and find the most recent one from this branch
-            PR_NUMBER=$(gh pr list --head "$BRANCH_NAME" --json number --jq '.[0].number' 2>/dev/null || echo "")
+            PR_NUMBER=$(gh pr list --repo "$TARGET_REPO" --head "$BRANCH_NAME" --json number --jq '.[0].number' 2>/dev/null || echo "")
             
             if [ -z "$PR_NUMBER" ]; then
               echo "[ERROR] Could not find PR for branch $BRANCH_NAME"
