@@ -27,19 +27,29 @@ public final class GitHubModelsClient implements BaAssistantClient {
      * Calls a Chat Completions compatible endpoint.
      *
      * Defaults are aimed at GitHub Models (Azure AI Inference compatible).
+     * Reasoning models (o1, o3, o4-mini, etc.) have strict restrictions:
+     *   - No temperature parameter (only default=1 supported)
+     *   - No response_format json_object
+     *   - No "system" role — use "developer" role instead
      */
     @Override
     public String runBaAssistant(String systemPrompt, String userPrompt) throws IOException, InterruptedException {
+        // Reasoning models (o1, o3, o4...) have strict API restrictions.
+        boolean isReasoningModel = model.matches("(?i)^o\\d.*");
+
         ObjectNode payload = HttpJson.MAPPER.createObjectNode();
         payload.put("model", model);
 
         ArrayNode messages = payload.putArray("messages");
-        messages.addObject().put("role", "system").put("content", systemPrompt);
+        if (isReasoningModel) {
+            // o-series models use "developer" role instead of "system"
+            messages.addObject().put("role", "developer").put("content", systemPrompt);
+        } else {
+            messages.addObject().put("role", "system").put("content", systemPrompt);
+            // Encourage strict JSON output (not supported by reasoning models)
+            payload.putObject("response_format").put("type", "json_object");
+        }
         messages.addObject().put("role", "user").put("content", userPrompt);
-
-        // Encourage strict JSON output.
-        payload.putObject("response_format").put("type", "json_object");
-        payload.put("temperature", 0.2);
 
         URI uri = URI.create(endpoint + "/chat/completions");
 
