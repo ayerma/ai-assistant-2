@@ -440,8 +440,7 @@ public final class ContentCreatorRunner {
         return prompt.toString();
     }
 
-    private static void enrichJiraTicketFromOutput(JiraClient jiraClient, String issueKey, JsonNode output)
-            throws Exception {
+    private static void enrichJiraTicketFromOutput(JiraClient jiraClient, String issueKey, JsonNode output) {
         System.out.println("[INFO] Enriching Jira ticket with interview Q&A content...");
 
         String topic = output.path("topic").asText("");
@@ -452,29 +451,29 @@ public final class ContentCreatorRunner {
             return;
         }
 
-        // Build formatted comment with Q&A content
-        StringBuilder comment = new StringBuilder();
-        comment.append("📚 Interview Questions Generated\n\n");
-        comment.append("*Topic: ").append(topic).append("*\n\n");
-        comment.append("---\n\n");
+        int total = questions.size();
+        int posted = 0;
 
-        int questionNumber = 1;
-        for (JsonNode questionNode : questions) {
+        for (int i = 0; i < total; i++) {
+            JsonNode questionNode = questions.get(i);
             String question = questionNode.path("question").asText("");
             String answer = questionNode.path("answer").asText("");
+            int num = i + 1;
 
-            comment.append("*Q").append(questionNumber).append(": ").append(question).append("*\n\n");
-            comment.append("A").append(questionNumber).append(": ").append(answer).append("\n\n");
-            comment.append("---\n\n");
+            String comment = "Q" + num + "/" + total + " [" + topic + "]\n\n"
+                    + question + "\n\n"
+                    + answer;
 
-            questionNumber++;
+            try {
+                System.out.println("[INFO] Posting comment " + num + "/" + total);
+                jiraClient.addComment(issueKey, comment);
+                posted++;
+            } catch (Exception e) {
+                System.err.println("[WARN] Failed to post comment for Q" + num + ": " + e.getMessage());
+            }
         }
 
-        comment.append("Total questions: ").append(questions.size()).append("\n");
-
-        // Add comment to Jira ticket
-        jiraClient.addComment(issueKey, comment.toString());
-        System.out.println("[SUCCESS] Added " + questions.size() + " interview questions to Jira ticket " + issueKey);
+        System.out.println("[INFO] Posted " + posted + "/" + total + " Q&A comments to Jira ticket " + issueKey);
     }
 
     private static String textAt(JsonNode node, String path) {
