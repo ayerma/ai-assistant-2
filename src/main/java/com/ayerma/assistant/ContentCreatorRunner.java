@@ -167,13 +167,7 @@ public final class ContentCreatorRunner {
         }
 
         String systemPrompt = roleInstructions + javaSpecialist + contentInstructions
-                + "\n\n## CRITICAL OUTPUT RULES\n"
-                + "Your response MUST be a single raw JSON object and absolutely nothing else.\n"
-                + "- Begin your response with `{` — zero words or characters before it\n"
-                + "- End your response with `}` — zero words or characters after it\n"
-                + "- Do NOT use markdown code fences (```json or ```)\n"
-                + "- Do NOT add any preamble, explanation, or postamble\n"
-                + "- Any non-JSON characters outside the object will cause a parse failure";
+                + "\n\nCRITICAL: Return ONLY the plain text answer. No JSON, no markdown, no preamble.";
 
         // Determine which client to use
         boolean useModelsApi = Env.optional("USE_MODELS_API", "true").equalsIgnoreCase("true");
@@ -239,21 +233,13 @@ public final class ContentCreatorRunner {
 
             System.out.println("[DEBUG] Received answer for question " + questionNumber);
 
-            // Extract JSON from markdown code blocks if present
-            String cleanedOutput = extractJsonFromMarkdown(assistantOutput);
-
-            // Parse the answer JSON
-            JsonNode answerData;
-            try {
-                answerData = HttpJson.MAPPER.readTree(cleanedOutput);
-            } catch (com.fasterxml.jackson.core.JsonParseException e) {
-                System.err.println("[ERROR] Failed to parse JSON for question " + questionNumber);
-                System.err.println("[DEBUG] Raw output (first 500 chars): " +
-                        assistantOutput.substring(0, Math.min(assistantOutput.length(), 500)));
-                System.err.println("[DEBUG] Cleaned output (first 500 chars): " +
-                        cleanedOutput.substring(0, Math.min(cleanedOutput.length(), 500)));
-                throw e;
-            }
+            // Build JSON programmatically from the plain-text answer.
+            // This avoids JSON parse failures caused by unescaped characters in model
+            // output.
+            String answerText = assistantOutput.trim();
+            ObjectNode answerData = HttpJson.MAPPER.createObjectNode();
+            answerData.put("question", question);
+            answerData.put("answer", answerText);
             answeredQuestions.add(answerData);
 
             questionNumber++;
@@ -404,7 +390,7 @@ public final class ContentCreatorRunner {
         prompt.append("Question: ").append(question).append("\n\n");
         prompt.append(
                 "Provide a comprehensive answer to this Java interview question following the Java specialist guidance.\n");
-        prompt.append("Return ONLY the JSON object following the exact schema defined in the instructions.\n");
+        prompt.append("Return ONLY the plain text answer. Do not echo the question. Do not use JSON or markdown.\n");
         return prompt.toString();
     }
 
