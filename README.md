@@ -37,6 +37,7 @@ Optional **GitHub repository variables**:
 - `TARGET_REF` (default: `main`)
 - `TARGET_REPO_PATH` (default: `target-repo`)
 - `AUTOMERGE` (default: `false`) - Auto-merge PRs after creation (Tech Assistant & Content-Creator)
+- `JIRA_DONE_TRANSITION_ID` (default: `31`) - Jira transition ID used to move a ticket to Done after a successful auto-merge
 - `JIRA_STORY_ISSUE_TYPE` (default: `Story`)
 - `JIRA_TASK_ISSUE_TYPE` (default: `Task`)
 - `JIRA_QUESTION_ISSUE_TYPE` (default: `Sub-task`)

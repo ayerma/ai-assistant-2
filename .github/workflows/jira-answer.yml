@@ -302,6 +302,28 @@ jobs:
             echo "[WARN] Failed to add merge comment to Jira"
           }
 
+      - name: Transition Jira ticket to Done
+        if: ${{ vars.AUTOMERGE == 'true' && env.MERGE_SUCCESS == 'true' }}
+        env:
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          JIRA_ISSUE_KEY: ${{ inputs.ticket_id }}
+          JIRA_DONE_TRANSITION_ID: ${{ vars.JIRA_DONE_TRANSITION_ID || '31' }}
+        run: |
+          echo "[INFO] Transitioning Jira ticket $JIRA_ISSUE_KEY to Done"
+
+          curl -X POST \
+            -u "$JIRA_EMAIL:$JIRA_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"transition\": {\"id\": \"$JIRA_DONE_TRANSITION_ID\"}}" \
+            "$JIRA_BASE_URL/rest/api/2/issue/$JIRA_ISSUE_KEY/transitions" || {
+            echo "[WARN] Failed to transition ticket - check JIRA_DONE_TRANSITION_ID configuration"
+            exit 0
+          }
+
+          echo "[SUCCESS] Jira ticket $JIRA_ISSUE_KEY transitioned to Done"
+
       - name: Update Jira with PR (no auto-merge)
         if: ${{ vars.AUTOMERGE != 'true' }}
         env:
