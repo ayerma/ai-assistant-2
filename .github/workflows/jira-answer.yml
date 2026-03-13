@@ -73,6 +73,22 @@ jobs:
             git config --global url."https://x-access-token:${TARGET_REPO_TOKEN}@github.com/".insteadOf "https://github.com/"
           fi
 
+      - name: Verify target repository write access
+        run: |
+          if [ -z "$TARGET_REPO_TOKEN" ]; then
+            echo "[ERROR] TARGET_REPO_TOKEN is required for pushing branches and creating PRs in $TARGET_REPO"
+            exit 1
+          fi
+
+          AUTH_PUSH_URL="https://x-access-token:${TARGET_REPO_TOKEN}@github.com/${TARGET_REPO}.git"
+          echo "[INFO] Verifying authenticated access to $TARGET_REPO before generating answers"
+
+          if ! git ls-remote "$AUTH_PUSH_URL" "refs/heads/$TARGET_REF" > /dev/null; then
+            echo "[ERROR] TARGET_REPO_TOKEN cannot access $TARGET_REPO."
+            echo "[ERROR] Check that the token is valid, has repository access, and includes contents write permission."
+            exit 1
+          fi
+
       - name: Install GitHub Copilot CLI
         run: |
           echo "Installing GitHub Copilot CLI..."
@@ -85,14 +101,24 @@ jobs:
           echo "Copilot CLI installed successfully"
 
       - name: Prepare questions JSON
+        env:
+          QUESTIONS_JSON_INPUT: ${{ inputs.questions_json }}
         run: |
           echo "[INFO] Writing questions JSON to file..."
-          cat > content-creator-questions.json << 'EOF'
-          ${{ inputs.questions_json }}
-          EOF
 
-          # Validate JSON
-          jq . content-creator-questions.json > /dev/null
+          # Write exactly what the workflow received, then validate it.
+          printf '%s' "$QUESTIONS_JSON_INPUT" > content-creator-questions.raw
+
+          if jq -e . content-creator-questions.raw > /dev/null 2>&1; then
+            jq . content-creator-questions.raw > content-creator-questions.json
+          else
+            echo "[ERROR] questions_json is not valid JSON."
+            echo "[ERROR] Received payload preview:"
+            head -c 300 content-creator-questions.raw || true
+            echo
+            echo '[ERROR] Expected format: {"topic":"...","questions":["..."]}'
+            exit 5
+          fi
 
           TOPIC=$(jq -r '.topic' content-creator-questions.json)
           QUESTION_COUNT=$(jq '.questions | length' content-creator-questions.json)
@@ -132,11 +158,6 @@ jobs:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
         run: |
           echo "[INFO] Enriching target repository with interview Q&A content..."
-
-          if [ -z "$TARGET_REPO_TOKEN" ]; then
-            echo "[ERROR] TARGET_REPO_TOKEN is required for pushing branches and creating PRs in $TARGET_REPO"
-            exit 1
-          fi
 
           # Read the generated Q&A content
           TOPIC=$(jq -r '.topic' content-creator-output.json)
@@ -194,12 +215,9 @@ jobs:
 
           git commit -m "Add interview questions: $TOPIC"
 
-          # Re-set remote URL with token in case Copilot CLI reset it
-          if [ -n "$TARGET_REPO_TOKEN" ]; then
-            git remote set-url origin "https://x-access-token:${TARGET_REPO_TOKEN}@github.com/${TARGET_REPO}.git"
-          fi
+          AUTH_PUSH_URL="https://x-access-token:${TARGET_REPO_TOKEN}@github.com/${TARGET_REPO}.git"
 
-          git push origin "$BRANCH_NAME"
+          git push "$AUTH_PUSH_URL" "HEAD:refs/heads/$BRANCH_NAME"
           echo "[SUCCESS] Pushed branch $BRANCH_NAME"
           cd ..
 
