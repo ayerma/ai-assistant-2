@@ -31,6 +31,7 @@ Optional **GitHub repository variables**:
 
 - `MODELS_ENDPOINT` (default: `https://models.inference.ai.azure.com`)
 - `MODELS_MODEL` (default: `gpt-4o`)
+- `CLI_MODEL` (optional) - Copilot CLI model override used when `USE_MODELS_API=false` or when workflows call `copilot` directly
 - `DEV_INSTRUCTIONS_PATH` (default: `instructions/platform/roles/dev-role.md`)
 - `TARGET_REPO` (format: `owner/repo`, required for Tech Assistant and Content-Creator)
 - `TARGET_REF` (default: `main`)
@@ -295,6 +296,7 @@ java -cp target/ai-assistant-2-automation-0.1.0-all.jar com.ayerma.assistant.Con
 - `USE_MODELS_API` (default: `true`) - set to `false` to use GitHub Copilot CLI
 - `MODELS_TOKEN` (required if `USE_MODELS_API=true`)
 - `COPILOT_GITHUB_TOKEN` (required if `USE_MODELS_API=false`)
+- `CLI_MODEL` (optional) - passed to Copilot CLI as `--model <value>` when set
 
 **Legacy Mode:**
 

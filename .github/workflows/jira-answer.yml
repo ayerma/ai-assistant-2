@@ -25,6 +25,7 @@ jobs:
       TARGET_REF: ${{ vars.TARGET_REF || 'main' }}
       TARGET_REPO_PATH: ${{ vars.TARGET_REPO_PATH || 'target-repo' }}
       TARGET_REPO_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
+      CLI_MODEL: ${{ vars.CLI_MODEL }}
 
     steps:
       - name: Checkout
@@ -201,7 +202,14 @@ jobs:
           Remember: Follow the ADDING_CONTENT.md instructions exactly!"
 
           echo "[INFO] Calling Copilot CLI to write content files..."
-          copilot --allow-all-tools -p "$PROMPT" 2>&1 | tee copilot-output.txt
+          COPILOT_ARGS=(--allow-all-tools -p "$PROMPT")
+          if [ -n "$CLI_MODEL" ]; then
+            echo "[INFO] Using Copilot CLI model: $CLI_MODEL"
+            COPILOT_ARGS=(--model "$CLI_MODEL" "${COPILOT_ARGS[@]}")
+          else
+            echo "[INFO] Using Copilot CLI default model"
+          fi
+          copilot "${COPILOT_ARGS[@]}" 2>&1 | tee copilot-output.txt
           echo "[INFO] Copilot CLI execution completed"
 
           # Commit and push via script

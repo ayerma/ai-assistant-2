@@ -15,9 +15,11 @@ import java.util.concurrent.TimeUnit;
  */
 public final class GitHubCopilotCliClient implements BaAssistantClient {
     private final String cliCommand;
+    private final String cliModel;
 
     public GitHubCopilotCliClient(String cliCommand) {
         this.cliCommand = cliCommand;
+        this.cliModel = System.getenv("CLI_MODEL");
     }
 
     @Override
@@ -27,6 +29,10 @@ public final class GitHubCopilotCliClient implements BaAssistantClient {
 
         List<String> command = new ArrayList<>();
         command.add(cliCommand);
+        if (cliModel != null && !cliModel.isBlank()) {
+            command.add("--model");
+            command.add(cliModel);
+        }
         command.add("--allow-all-tools");
         command.add("-p");
         command.add(combinedPrompt);
@@ -53,7 +59,9 @@ public final class GitHubCopilotCliClient implements BaAssistantClient {
             command.add("export GITHUB_TOKEN='" + authToken + "' && " +
                     "export GH_TOKEN='" + authToken + "' && " +
                     "export COPILOT_GITHUB_TOKEN='" + authToken + "' && " +
-                    cliCommand + " --allow-all-tools -p \"$PROMPT\"");
+                    (cliModel != null && !cliModel.isBlank()
+                            ? "export CLI_MODEL='" + cliModel + "' && " + cliCommand + " --model \"$CLI_MODEL\" --allow-all-tools -p \"$PROMPT\""
+                            : cliCommand + " --allow-all-tools -p \"$PROMPT\""));
             pb = new ProcessBuilder(command);
             pb.environment().put("PROMPT", combinedPrompt);
             pb.redirectErrorStream(true);
@@ -65,7 +73,14 @@ public final class GitHubCopilotCliClient implements BaAssistantClient {
                     .println("[WARN] No authentication token found in COPILOT_GITHUB_TOKEN, GH_TOKEN, or GITHUB_TOKEN");
         }
 
-        System.out.println("[INFO] Executing CLI command: " + cliCommand + " --allow-all-tools -p \"<prompt>\"");
+        StringBuilder commandDescription = new StringBuilder("[INFO] Executing CLI command: ")
+                .append(cliCommand)
+                .append(' ');
+        if (cliModel != null && !cliModel.isBlank()) {
+            commandDescription.append("--model ").append(cliModel).append(' ');
+        }
+        commandDescription.append("--allow-all-tools -p \"<prompt>\"");
+        System.out.println(commandDescription);
 
         Process process;
         try {
