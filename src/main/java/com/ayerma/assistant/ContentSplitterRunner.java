@@ -11,6 +11,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 public final class ContentSplitterRunner {
+    private static final String CREATED_TICKET_LABEL = "Content";
+
     public static void main(String[] args) throws Exception {
         System.out.println("[INFO] Starting Content-Splitter Runner...");
 
@@ -26,7 +28,8 @@ public final class ContentSplitterRunner {
 
         String outputPath = Env.contentSplitterOutputPath();
 
-        // Check if we should create Jira tickets from existing output file (CLI workflow post-processing)
+        // Check if we should create Jira tickets from existing output file (CLI
+        // workflow post-processing)
         boolean createFromOutput = Env.optional("CREATE_JIRA_FROM_OUTPUT", "false").equalsIgnoreCase("true");
         if (createFromOutput) {
             System.out.println("[INFO] CREATE_JIRA_FROM_OUTPUT mode - reading from " + outputPath);
@@ -87,7 +90,8 @@ public final class ContentSplitterRunner {
         Files.writeString(Path.of(promptOutputPath), combinedPrompt, StandardCharsets.UTF_8);
         System.out.println("[INFO] Wrote combined prompt to: " + promptOutputPath);
 
-        // Check if we should just output the prompt and exit (CLI mode handles execution in workflow)
+        // Check if we should just output the prompt and exit (CLI mode handles
+        // execution in workflow)
         boolean outputPromptOnly = Env.optional("OUTPUT_PROMPT_ONLY", "false").equalsIgnoreCase("true");
 
         if (outputPromptOnly) {
@@ -128,14 +132,18 @@ public final class ContentSplitterRunner {
 
     private static void createJiraTicketsFromOutput(JiraClient jiraClient, String issueKey, JsonNode parsed)
             throws Exception {
-        System.out.println("[INFO] Creating Jira child tasks from Content-Splitter output...");
+        System.out.println("[INFO] Creating Jira tasks from Content-Splitter output...");
 
         // Extract project key from issue key (e.g., "IN-1" -> "IN")
         String projectKey = issueKey.contains("-") ? issueKey.substring(0, issueKey.indexOf('-')) : issueKey;
         System.out.println("[INFO] Extracted project key: " + projectKey + " from issue: " + issueKey);
 
         String taskIssueType = Env.optional("JIRA_TASK_ISSUE_TYPE", "Task");
+        String linkType = Env.optional("JIRA_LINK_TYPE", "Relates");
+        boolean useParentRelationship = isSubtaskIssueType(taskIssueType);
         System.out.println("[DEBUG] Task issue type: " + taskIssueType);
+        System.out.println(
+                "[DEBUG] Parent relationship mode: " + (useParentRelationship ? "sub-task parent" : "linked issue"));
 
         JsonNode subtopics = parsed.get("subtopics");
         if (subtopics == null || !subtopics.isArray() || subtopics.isEmpty()) {
@@ -151,16 +159,33 @@ public final class ContentSplitterRunner {
 
             String summary = title != null && !title.isBlank() ? title : "Content Subtopic";
 
-            System.out.println("[DEBUG] Creating task for subtopic with type=" + taskIssueType + ", parent=" + issueKey
+            System.out.println("[DEBUG] Creating task for subtopic with type=" + taskIssueType + ", issue=" + issueKey
                     + ", summary=" + summary);
 
-            String createdKey = jiraClient.createIssueWithParentAndLabels(projectKey, taskIssueType, issueKey, summary,
-                    null, "Content-breaker");
+            String createdKey;
+            if (useParentRelationship) {
+                createdKey = jiraClient.createIssueWithParentAndLabels(projectKey, taskIssueType, issueKey, summary,
+                        null, CREATED_TICKET_LABEL);
+            } else {
+                createdKey = jiraClient.createIssueWithLabels(projectKey, taskIssueType, summary, null,
+                        CREATED_TICKET_LABEL);
+                jiraClient.linkIssues(createdKey, issueKey, linkType);
+            }
             createdCount++;
             System.out.println("[SUCCESS] Created Jira task: " + createdKey + " (" + summary + ")");
         }
 
-        System.out.println("[SUCCESS] Created " + createdCount + " Jira child tasks with 'Content-breaker' label");
+        System.out
+                .println("[SUCCESS] Created " + createdCount + " Jira tasks with '" + CREATED_TICKET_LABEL + "' label");
+    }
+
+    private static boolean isSubtaskIssueType(String issueTypeName) {
+        if (issueTypeName == null) {
+            return false;
+        }
+
+        String normalized = issueTypeName.trim().toLowerCase();
+        return normalized.equals("sub-task") || normalized.equals("subtask");
     }
 
     private static String loadSystemPrompt(String instructionsPath, String technicalReqPath) throws IOException {

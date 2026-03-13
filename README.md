@@ -99,24 +99,24 @@ See `instructions/platform/roles/ba-role.md` for detailed examples and guideline
 
 ## Content-Splitter Assistant
 
-The Content-Splitter assistant analyzes content-focused Jira tickets and automatically breaks them down into logical subtopics, creating child tasks for each subtopic.
+The Content-Splitter assistant analyzes content-focused Jira tickets and automatically breaks them down into logical subtopics, creating separate Jira tasks for each subtopic.
 
 ### Purpose
 
 - Analyzes content requirements from a Jira ticket
 - Identifies logical subtopics or content areas
 - Creates separate Jira tasks for each subtopic
-- Each created task is linked to the parent ticket and labeled with **"Content-breaker"**
+- Each created task is linked to the parent ticket and labeled with **"Content"**
 
 ### How It Works
 
 1. Takes a Jira ticket describing content needs (e.g., documentation, marketing content, guides)
 2. AI analyzes the content area and breaks it into focused subtopics
-3. For each subtopic, a child Task is created in Jira with:
+3. For each subtopic, a Jira task is created with:
    - Clear title describing the subtopic
    - Detailed description of what should be covered
-   - Linked to the original parent ticket
-   - Tagged with `Content-breaker` label (only label, no `DEV-AI`)
+   - Linked to the original ticket
+   - Tagged with `Content` label (only label, no `DEV-AI`)
 
 ### Usage
 
@@ -152,13 +152,13 @@ Description: Need comprehensive docs covering authentication, endpoints, error h
 
 **Output (Jira Tasks Created):**
 
-- `PROJ-124`: Getting Started and Authentication [Content-breaker]
-- `PROJ-125`: Endpoint Reference - User Management [Content-breaker]
-- `PROJ-126`: Endpoint Reference - Data Operations [Content-breaker]
-- `PROJ-127`: Error Handling and Status Codes [Content-breaker]
-- `PROJ-128`: Code Examples and SDKs [Content-breaker]
+- `PROJ-124`: Getting Started and Authentication [Content]
+- `PROJ-125`: Endpoint Reference - User Management [Content]
+- `PROJ-126`: Endpoint Reference - Data Operations [Content]
+- `PROJ-127`: Error Handling and Status Codes [Content]
+- `PROJ-128`: Code Examples and SDKs [Content]
 
-All tasks are linked to `PROJ-123` as child tasks.
+All tasks are linked to `PROJ-123`.
 
 ### Runner Class
 

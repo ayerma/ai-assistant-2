@@ -37,6 +37,12 @@ public final class JiraClient {
 
     public String createIssue(String projectKey, String issueTypeName, String summary, String description)
             throws IOException, InterruptedException {
+        return createIssueWithLabels(projectKey, issueTypeName, summary, description, "DEV-AI");
+    }
+
+    public String createIssueWithLabels(String projectKey, String issueTypeName, String summary, String description,
+            String... customLabels)
+            throws IOException, InterruptedException {
         URI uri = URI.create(baseUrl + "/rest/api/3/issue");
 
         System.out.println("[DEBUG] Jira createIssue => project=" + projectKey + ", type=" + issueTypeName
@@ -51,9 +57,11 @@ public final class JiraClient {
             fields.set("description", toAdf(description));
         }
 
-        // Add DEV-AI label
+        // Add custom labels
         ArrayNode labels = HttpJson.MAPPER.createArrayNode();
-        labels.add("DEV-AI");
+        for (String label : customLabels) {
+            labels.add(label);
+        }
         fields.set("labels", labels);
 
         ObjectNode payload = HttpJson.MAPPER.createObjectNode();
