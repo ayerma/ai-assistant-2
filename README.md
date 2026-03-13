@@ -297,6 +297,7 @@ java -cp target/ai-assistant-2-automation-0.1.0-all.jar com.ayerma.assistant.Con
 - `MODELS_TOKEN` (required if `USE_MODELS_API=true`)
 - `COPILOT_GITHUB_TOKEN` (required if `USE_MODELS_API=false`)
 - `CLI_MODEL` (optional) - passed to Copilot CLI as `--model <value>` when set
+- `POST_ANSWERS_TO_JIRA` (default: `true`) - set to `false` to skip posting individual Q&A comments to Jira and rely on the PR comment only
 
 **Legacy Mode:**
 

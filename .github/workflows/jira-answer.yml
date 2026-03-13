@@ -146,6 +146,7 @@ jobs:
           TECHNICAL_REQUIREMENTS_PATH: instructions/platform/technical/java-specialist.md
           CONTENT_CREATOR_QUESTIONS_INPUT_PATH: content-creator-questions.json
           CONTENT_CREATOR_OUTPUT_PATH: content-creator-output.json
+          POST_ANSWERS_TO_JIRA: "false"
 
           JIRA_ISSUE_KEY: ${{ inputs.ticket_id }}
         run: |

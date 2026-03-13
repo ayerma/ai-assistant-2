@@ -256,8 +256,8 @@ public final class ContentCreatorRunner {
                 StandardCharsets.UTF_8);
         System.out.println("[SUCCESS] Wrote final Q&A output to: " + outputPath);
 
-        // Enrich Jira ticket with Q&A content
-        enrichJiraTicketFromOutput(jiraClient, issueKey, finalOutput);
+        // Optionally enrich Jira ticket with Q&A content
+        maybeEnrichJiraTicketFromOutput(jiraClient, issueKey, finalOutput);
     }
 
     private static void runLegacyMode(String[] args) throws Exception {
@@ -282,7 +282,7 @@ public final class ContentCreatorRunner {
             String outputContent = Files.readString(Path.of(outputPath), StandardCharsets.UTF_8);
             JsonNode parsed = HttpJson.MAPPER.readTree(outputContent);
             System.out.println("[INFO] Successfully loaded Content Creator output from file");
-            enrichJiraTicketFromOutput(jiraClient, issueKey, parsed);
+            maybeEnrichJiraTicketFromOutput(jiraClient, issueKey, parsed);
             return;
         }
 
@@ -366,8 +366,18 @@ public final class ContentCreatorRunner {
                 HttpJson.MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(parsed), StandardCharsets.UTF_8);
         System.out.println("[SUCCESS] Wrote Content Creator output to: " + outputPath);
 
-        // Enrich Jira ticket with Q&A content
-        enrichJiraTicketFromOutput(jiraClient, issueKey, parsed);
+        // Optionally enrich Jira ticket with Q&A content
+        maybeEnrichJiraTicketFromOutput(jiraClient, issueKey, parsed);
+    }
+
+    private static void maybeEnrichJiraTicketFromOutput(JiraClient jiraClient, String issueKey, JsonNode output) {
+        boolean postAnswersToJira = Env.optional("POST_ANSWERS_TO_JIRA", "true").equalsIgnoreCase("true");
+        if (!postAnswersToJira) {
+            System.out.println("[INFO] POST_ANSWERS_TO_JIRA=false - skipping Jira Q&A comments");
+            return;
+        }
+
+        enrichJiraTicketFromOutput(jiraClient, issueKey, output);
     }
 
     private static String buildQuestionsUserPrompt(String issueKey, String topic) {
