@@ -174,11 +174,14 @@ jobs:
           cd "$TARGET_REPO_PATH"
           git checkout -b "$BRANCH_NAME"
 
+          # Keep all files Copilot needs inside the target repository to avoid cross-repo access issues
+          cp ../content-creator-output.json ./content-creator-output.json
+
           # Prompt Copilot to write content files only (no git/PR operations)
           PROMPT="You are a technical content organizer.
 
           I have generated Java interview questions with answers for the topic: '$TOPIC'.
-          The Q&A content is in the file ../content-creator-output.json with structure:
+          The Q&A content is in the file content-creator-output.json with structure:
           {
             \"topic\": \"...\",
             \"questions\": [{\"question\": \"...\", \"answer\": \"...\"}]
@@ -193,7 +196,7 @@ jobs:
 
           Your task:
           1. Read public/data/ADDING_CONTENT.md
-          2. Read ../content-creator-output.json with the Q&A content
+          2. Read content-creator-output.json with the Q&A content
           3. Create the required files in the CURRENT repository following the EXACT structure in ADDING_CONTENT.md
           4. Use the format, naming conventions, and organization specified in ADDING_CONTENT.md
 
@@ -222,6 +225,9 @@ jobs:
             echo "[ERROR] No changes detected - Copilot may not have written any files"
             exit 1
           fi
+
+          git restore --staged content-creator-output.json || true
+          rm -f content-creator-output.json
 
           git commit -m "Add interview questions: $TOPIC"
 
