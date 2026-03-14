@@ -173,13 +173,12 @@ jobs:
           # Create branch before Copilot writes files
           cd "$TARGET_REPO_PATH"
           git checkout -b "$BRANCH_NAME"
-          cd ..
 
           # Prompt Copilot to write content files only (no git/PR operations)
           PROMPT="You are a technical content organizer.
 
           I have generated Java interview questions with answers for the topic: '$TOPIC'.
-          The Q&A content is in the file content-creator-output.json (in the current directory) with structure:
+          The Q&A content is in the file ../content-creator-output.json with structure:
           {
             \"topic\": \"...\",
             \"questions\": [{\"question\": \"...\", \"answer\": \"...\"}]
@@ -187,18 +186,21 @@ jobs:
 
           CRITICAL REQUIREMENT - READ FIRST:
           Before creating any files, you MUST read and follow the instructions in the file:
-          $TARGET_REPO_PATH/public/data/ADDING_CONTENT.md
+          public/data/ADDING_CONTENT.md
 
           This file contains the REQUIRED format and structure for adding content to this repository.
           You MUST follow those instructions exactly when creating the markdown files.
 
           Your task:
-          1. Read $TARGET_REPO_PATH/public/data/ADDING_CONTENT.md
-          2. Read content-creator-output.json with the Q&A content
-          3. Create markdown files inside $TARGET_REPO_PATH following the EXACT structure in ADDING_CONTENT.md
+          1. Read public/data/ADDING_CONTENT.md
+          2. Read ../content-creator-output.json with the Q&A content
+          3. Create the required files in the CURRENT repository following the EXACT structure in ADDING_CONTENT.md
           4. Use the format, naming conventions, and organization specified in ADDING_CONTENT.md
 
-          IMPORTANT: Only write the content files. Do NOT create branches, run git commands, or create pull requests.
+          IMPORTANT:
+          - Apply the file changes directly now. Do NOT only describe a plan.
+          - Only write the content files. Do NOT create branches, run git commands, or create pull requests.
+          - All file edits must be made inside the CURRENT repository.
 
           Remember: Follow the ADDING_CONTENT.md instructions exactly!"
 
@@ -210,11 +212,10 @@ jobs:
           else
             echo "[INFO] Using Copilot CLI default model"
           fi
-          copilot "${COPILOT_ARGS[@]}" 2>&1 | tee copilot-output.txt
+          copilot "${COPILOT_ARGS[@]}" 2>&1 | tee ../copilot-output.txt
           echo "[INFO] Copilot CLI execution completed"
 
           # Commit and push via script
-          cd "$TARGET_REPO_PATH"
           git add .
 
           if git diff --cached --quiet; then
